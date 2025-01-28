@@ -16,7 +16,7 @@ import { workspaceForConversationIdentity } from '~/common/stores/workspace/work
 import { DMessage, DMessageId, DMessageMetadata, MESSAGE_FLAG_AIX_SKIP, messageHasUserFlag } from './chat.message';
 import type { DMessageFragment, DMessageFragmentId } from './chat.fragments';
 import { V3StoreDataToHead, V4ToHeadConverters } from './chats.converters';
-import { conversationTitle, createDConversation, DConversation, DConversationId, duplicateDConversationNoVoid } from './chat.conversation';
+import { conversationTitle, createDConversation, DConversation, DConversationId, duplicateDConversation } from './chat.conversation';
 import { estimateTokensForFragments } from './chat.tokens';
 import { gcChatImageAssets } from '~/common/stores/chat/chat.gc';
 
@@ -53,6 +53,7 @@ export interface ChatActions {
   setAutoTitle: (cId: DConversationId, autoTitle: string) => void;
   setUserTitle: (cId: DConversationId, userTitle: string) => void;
   setUserSymbol: (cId: DConversationId, userSymbol: string | null) => void;
+  title: (cId: DConversationId) => string | undefined;
 
   // utility function
   _editConversation: (cId: DConversationId, update: Partial<DConversation> | ((conversation: DConversation) => Partial<DConversation>)) => void;
@@ -123,7 +124,7 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
         if (!conversation)
           return null;
 
-        const branched = duplicateDConversationNoVoid(conversation, messageId ?? undefined);
+        const branched = duplicateDConversation(conversation, messageId ?? undefined, false);
 
         _set({
           conversations: [branched, ...conversations],
@@ -388,6 +389,11 @@ export const useChatStore = create<ConversationsStore>()(/*devtools(*/
             userTitle,
             ...(!userTitle && { autoTitle: undefined }), // clear autotitle when clearing usertitle
           }),
+
+      title: (conversationId: DConversationId): string | undefined => {
+        const existing = _get().conversations.find(_c => _c.id === conversationId);
+        return existing ? conversationTitle(existing) : undefined;
+      },
 
       setUserSymbol: (conversationId: DConversationId, userSymbol: string | null) =>
         _get()._editConversation(conversationId,

@@ -1,6 +1,6 @@
 import { agiUuid } from '~/common/util/idUtils';
 
-import { createPlaceholderVoidFragment, createTextContentFragment, DMessageFragment, duplicateDMessageFragmentsNoVoid, isAttachmentFragment, isContentFragment, isVoidFragment } from './chat.fragments';
+import { createPlaceholderVoidFragment, createTextContentFragment, DMessageFragment, duplicateDMessageFragments, isAttachmentFragment, isContentFragment, isVoidFragment } from './chat.fragments';
 
 import type { ModelVendorId } from '~/modules/llms/vendors/vendors.registry';
 
@@ -145,12 +145,12 @@ export function createDMessageFromFragments(role: DMessageRole, fragments: DMess
 
 // helpers - duplication
 
-export function duplicateDMessageNoVoid(message: Readonly<DMessage>): DMessage {
+export function duplicateDMessage(message: Readonly<DMessage>, skipVoid: boolean): DMessage {
   return {
     id: agiUuid('chat-dmessage'),
 
     role: message.role,
-    fragments: duplicateDMessageFragmentsNoVoid(message.fragments), // [*] full message duplication (see downstream)
+    fragments: duplicateDMessageFragments(message.fragments, skipVoid), // [*] full message duplication (see downstream)
 
     ...(message.pendingIncomplete ? { pendingIncomplete: true } : {}),
 
@@ -234,6 +234,10 @@ export function messageSetUserFlag(message: Pick<DMessage, 'userFlags'>, flag: D
 // helpers during the transition from V3
 
 export function messageFragmentsReduceText(fragments: DMessageFragment[], fragmentSeparator: string = '\n\n', excludeAttachmentFragments?: boolean): string {
+
+  // quick path for empty fragments
+  if (!fragments.length)
+    return '';
 
   return fragments
     .map(fragment => {

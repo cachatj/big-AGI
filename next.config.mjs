@@ -18,13 +18,6 @@ buildType && console.log(` 🧠 big-AGI: building for ${buildType}...\n`);
 let nextConfig = {
   reactStrictMode: true,
 
-  // Add experimental configuration for Turbopack
-  experimental: {
-    turbo: {
-      enabled: true,
-    },
-  },
-
   // [exports] https://nextjs.org/docs/advanced-features/static-html-export
   ...buildType && {
     output: buildType,
