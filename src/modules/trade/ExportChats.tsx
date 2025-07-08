@@ -7,14 +7,16 @@ import SyncIcon from '@mui/icons-material/Sync';
 
 import { getBackendCapabilities } from '~/modules/backend/store-backend-capabilities';
 
-import { DConversationId, getConversation } from '~/common/state/store-chats';
+import type { DConversationId } from '~/common/stores/chat/chat.conversation';
 import { GoodTooltip } from '~/common/components/GoodTooltip';
 import { KeyStroke } from '~/common/components/KeyStroke';
+import { getConversation } from '~/common/stores/chat/store-chats';
 
 import { ChatLinkExport } from './link/ChatLinkExport';
+import { FlashBackup } from './BackupRestore';
 import { PublishExport } from './publish/PublishExport';
-import { downloadAllConversationsJson, downloadConversation } from './trade.client';
-import { syncAllConversations } from '~/modules/supabasesync/supabaseSync.client';
+import { downloadAllJsonV1B, downloadSingleChat } from './trade.client';
+
 
 export type ExportConfig = {
   dir: 'export',
@@ -48,7 +50,7 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
     if (!props.config.conversationId) return;
     const conversation = getConversation(props.config.conversationId);
     if (!conversation) return;
-    downloadConversation(conversation, 'json')
+    downloadSingleChat(conversation, 'json')
       .then(() => setDownloadedJSONState('ok'))
       .catch(() => setDownloadedJSONState('fail'));
   };
@@ -57,13 +59,13 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
     if (!props.config.conversationId) return;
     const conversation = getConversation(props.config.conversationId);
     if (!conversation) return;
-    downloadConversation(conversation, 'markdown')
+    downloadSingleChat(conversation, 'markdown')
       .then(() => setDownloadedMarkdownState('ok'))
       .catch(() => setDownloadedMarkdownState('fail'));
   };
 
   const handleDownloadAllConversationsJSON = () => {
-    downloadAllConversationsJson()
+    downloadAllJsonV1B()
       .then(() => setDownloadedAllState('ok'))
       .catch(() => setDownloadedAllState('fail'));
   };
@@ -94,7 +96,7 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
             </Typography>
           )}
 
-          <GoodTooltip title={<KeyStroke dark combo='Ctrl + S' />}>
+          <GoodTooltip title={<KeyStroke variant='solid' combo='Ctrl + S' />}>
             <Button
               variant='soft' disabled={!hasConversation}
               color={downloadedJSONState === 'ok' ? 'success' : downloadedJSONState === 'fail' ? 'warning' : 'primary'}
@@ -156,24 +158,11 @@ export function ExportChats(props: { config: ExportConfig, onClose: () => void }
               sx={{ minWidth: 240, justifyContent: 'space-between' }}
               onClick={handleDownloadAllConversationsJSON}
             >
-              Download All · JSON
+              Backup All Chats
             </Button>
 
-            <Button
-              variant='soft'
-              color={syncAllState === 'ok' ? 'success' : syncAllState === 'fail' ? 'warning' : 'primary'}
-              endDecorator={syncAllState === 'ok' ? <DoneIcon /> : syncAllState === 'fail' ? '✘' : <SyncIcon />}
-              sx={{ minWidth: 240, justifyContent: 'space-between' }}
-              onClick={handleSyncAllConversations}
-            >
-              Sync
-            </Button>
-
-            {syncMessage && (
-              <Typography level='body-sm'>
-                {syncMessage}
-              </Typography>
-            )}
+            {/* Insert to Download a Flash */}
+            <FlashBackup />
 
           </Box>
         </Grid>

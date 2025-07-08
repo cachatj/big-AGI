@@ -1,29 +1,47 @@
 import * as React from 'react';
 
+import { AixDebuggerDialog } from '~/modules/aix/client/debugger/AixDebuggerDialog';
 import { ModelsModal } from '~/modules/llms/models-modal/ModelsModal';
 import { SettingsModal } from '../../../apps/settings-modal/SettingsModal';
 import { ShortcutsModal } from '../../../apps/settings-modal/ShortcutsModal';
-import { useOptimaLayout } from './useOptimaLayout';
+
+import { LogViewerDialog } from '~/common/logger/viewer/LoggerViewerDialog';
+
+import { optimaActions, optimaOpenPreferences, useOptimaModals } from './useOptima';
 
 
 export function Modals(props: { suspendAutoModelsSetup?: boolean }) {
 
   // external state
-  const {
-    showPreferencesTab, closePreferences,
-    showShortcuts, openShortcuts, closeShortcuts,
-  } = useOptimaLayout();
+  const { preferencesTab, showAIXDebugger, showKeyboardShortcuts, showLogger, showPreferences } = useOptimaModals();
+
+  // derived state
+  const { closeAIXDebugger, closeKeyboardShortcuts, closeLogger, closePreferences, openKeyboardShortcuts } = optimaActions();
 
   return <>
 
-    {/* Overlay Settings */}
-    <SettingsModal open={!!showPreferencesTab} tabIndex={showPreferencesTab} onClose={closePreferences} onOpenShortcuts={openShortcuts} />
+    {/* Overlay - Preferences Modal */}
+    <SettingsModal
+      open={showPreferences}
+      tab={preferencesTab}
+      setTab={optimaOpenPreferences}
+      onClose={closePreferences}
+      onOpenShortcuts={openKeyboardShortcuts}
+    />
 
     {/* Overlay Models + LLM Options */}
     <ModelsModal suspendAutoModelsSetup={props.suspendAutoModelsSetup} />
 
+    {/* Logger */}
+    {showLogger && <LogViewerDialog onClose={closeLogger} />}
+
+    {/* AIX Debugger Dialog */}
+    {showAIXDebugger && <AixDebuggerDialog onClose={closeAIXDebugger} />}
+
     {/* Overlay Shortcuts */}
-    {showShortcuts && <ShortcutsModal onClose={closeShortcuts} />}
+    {showKeyboardShortcuts && (
+      <ShortcutsModal onClose={closeKeyboardShortcuts} />
+    )}
 
   </>;
 }

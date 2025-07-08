@@ -1,46 +1,66 @@
-import { apiAsync } from '~/common/util/trpc.client';
+import { apiStream } from '~/common/util/trpc.client';
 
 import { useProdiaStore } from './store-module-prodia';
 
+import type { T2iCreateImageOutput } from '../t2i.server';
 
-export async function prodiaGenerateImages(imageText: string, count: number) {
+
+export async function prodiaGenerateImages(imageText: string, count: number): Promise<T2iCreateImageOutput[]> {
+
   // use the most current model and settings
   const {
-    prodiaApiKey: prodiaKey, prodiaModelId, prodiaModelGen,
-    prodiaNegativePrompt: negativePrompt, prodiaSteps: steps, prodiaCfgScale: cfgScale,
-    prodiaAspectRatio: aspectRatio, prodiaUpscale: upscale,
-    prodiaResolution: resolution,
-    prodiaSeed: seed,
+    apiKey,
+    modelId,
+    resolution,
+    negativePrompt,
+    fluxSteps,
+    sdxlSteps,
+    sdCfgScale,
+    stylePreset,
+    seed,
   } = useProdiaStore.getState();
 
-  // Run the image generation 'count' times in parallel
-  const imageUrls: string[] = await Promise.all(
-    // using an array of 'count' number of promises
-    Array(count).fill(undefined).map(async () => {
 
-      const images = await apiAsync.prodia.createImage.query({
-        ...(!!prodiaKey && { prodiaKey }),
-        prodiaModel: prodiaModelId || 'sd_xl_base_1.0.safetensors [be9edd61]', // was: Realistic_Vision_V5.0.safetensors [614d1063]
-        prodiaGen: prodiaModelGen || 'sd', // data versioning fix
-        prompt: imageText,
-        ...(!!negativePrompt && { negativePrompt }),
-        ...(!!steps && { steps }),
-        ...(!!cfgScale && { cfgScale }),
-        ...(!!aspectRatio && aspectRatio !== 'square' && { aspectRatio }),
-        ...(upscale && { upscale }),
-        ...(!!resolution && { resolution }),
-        ...(!!seed && { seed }),
-      });
+  let width: number;
+  let height: number;
+  if (resolution) {
+    const [widthStr, heightStr] = resolution.split('x');
+    width = parseInt(widthStr, 10);
+    height = parseInt(heightStr, 10);
+  }
 
-      if (images.length !== 1)
-        throw new Error('Prodia image generation failed - expected 1 image, got ' + images.length);
-      const { imageUrl, altText } = images[0];
+  const generateImage = async (): Promise<T2iCreateImageOutput[]> => {
+    const operations = await apiStream.prodia.createImage.query({
+      ...(apiKey && { prodiaKey: apiKey }),
+      prodiaModel: modelId,
+      prompt: imageText,
+      ...(negativePrompt && { negativePrompt }),
+      ...(width && height && { width, height }),
+      ...(fluxSteps && { fluxSteps }),
+      ...(sdxlSteps && { sdxlSteps }),
+      ...(sdCfgScale && { sdCfgScale }),
+      ...(stylePreset && { stylePreset }),
+      ...(seed && { seed }),
+    });
 
-      // return a list of strings as markdown images
-      return `![${altText}](${imageUrl})`;
-    }),
-  );
+    const generatedImages: T2iCreateImageOutput[] = [];
+    for await (const op of operations)
+      if (op.p === 'createImage')
+        generatedImages.push(op.image);
 
-  // Return the resulting image URLs
-  return imageUrls;
+    if (!generatedImages.length)
+      throw new Error('No images were generated');
+
+    return generatedImages;
+  };
+
+  // Run the image generation 'count' times in parallel and handle all results
+  const imagePromises = Array.from({ length: count }, generateImage);
+  const results = await Promise.allSettled(imagePromises);
+
+  // Filter and return only the successful results
+  return results
+    .filter((result): result is PromiseFulfilledResult<T2iCreateImageOutput[]> => result.status === 'fulfilled')
+    .map(result => result.value)
+    .flat();
 }
