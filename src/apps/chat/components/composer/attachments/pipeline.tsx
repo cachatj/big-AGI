@@ -297,7 +297,7 @@ export async function attachmentPerformConversion(attachment: Readonly<Attachmen
         break;
       }
       // duplicate the ArrayBuffer to avoid mutation
-      const pdfData = new Uint8Array(input.data.slice(0));
+      const pdfData = input.data.slice(0);
       const pdfText = await pdfToText(pdfData);
       outputs.push({
         type: 'text-block',
