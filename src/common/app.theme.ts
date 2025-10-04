@@ -3,16 +3,13 @@ import createCache from '@emotion/cache';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import { extendTheme } from '@mui/joy';
 
-import { animationEnterModal } from '~/common/util/animUtils';
-
-
-// Definitions
-export type UIComplexityMode = 'minimal' | 'pro' | 'extra';
-export type ContentScaling = 'xs' | 'sm' | 'md';
-
 
 // CSS utils
 export const hideOnMobile = { display: { xs: 'none', md: 'flex' } };
+// export const hideOnDesktop = { display: { xs: 'flex', md: 'none' } };
+
+// Dimensions
+export const formLabelStartWidth = 140;
 
 
 // Theme & Fonts
@@ -23,7 +20,6 @@ const font = Inter({
   display: 'swap',
   fallback: ['Helvetica', 'Arial', 'sans-serif'],
 });
-export const themeFontFamilyCss = font.style.fontFamily;
 
 const jetBrainsMono = JetBrains_Mono({
   weight: ['400', '500', '600', '700'],
@@ -31,14 +27,12 @@ const jetBrainsMono = JetBrains_Mono({
   display: 'swap',
   fallback: ['monospace'],
 });
-export const themeCodeFontFamilyCss = jetBrainsMono.style.fontFamily;
 
-
-export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
+export const appTheme = extendTheme({
   fontFamily: {
-    body: themeFontFamilyCss,
-    display: themeFontFamilyCss,
-    code: themeCodeFontFamilyCss,
+    body: font.style.fontFamily,
+    display: font.style.fontFamily,
+    code: jetBrainsMono.style.fontFamily,
   },
   colorSchemes: {
     light: {
@@ -118,19 +112,14 @@ export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
     //   },
     // },
 
-    JoyModal: {
-      styleOverrides: {
-        backdrop: !uiComplexityMinimal ? undefined : {
-          backdropFilter: 'none',
-          // backdropFilter: 'blur(2px)',
-        },
-        root: uiComplexityMinimal ? undefined : {
-          '& .agi-animate-enter': {
-            animation: `${animationEnterModal} 0.2s`,
-          },
-        },
-      },
-    },
+    // JoyModal: {
+    //   styleOverrides: {
+    //     backdrop: {
+    //       // backdropFilter: 'blur(2px)',
+    //       backdropFilter: 'none',
+    //     },
+    //   },
+    // },
 
     /**
      * Switch: increase the size of the thumb, to a default iconButton
@@ -140,10 +129,9 @@ export const createAppTheme = (uiComplexityMinimal: boolean) => extendTheme({
       styleOverrides: {
         root: ({ ownerState }) => ({
           ...(ownerState.size === 'md' && {
-            // '--Switch-trackWidth': '36px',
-            // '--Switch-trackHeight': '22px',
-            // '--Switch-thumbSize': '17px',
-            '--Switch-thumbSize': '16px',
+            '--Switch-trackWidth': '36px',
+            '--Switch-trackHeight': '22px',
+            '--Switch-thumbSize': '17px',
           }),
         }),
       },
@@ -161,13 +149,14 @@ export const lineHeightTextareaMd = 1.75;
 export const themeZIndexBeamView = 10;
 export const themeZIndexPageBar = 25;
 export const themeZIndexDesktopDrawer = 26;
-export const themeZIndexDesktopPanel = 27;
-export const themeZIndexDesktopNav = 30;
-export const themeZIndexChatBubble = 50;
+export const themeZIndexDesktopNav = 27;
 export const themeZIndexOverMobileDrawer = 1301;
 
+export const themeBreakpoints = appTheme.breakpoints.values;
 
-// Dynamic UI Sizing
+
+// Dyanmic UI Sizing
+export type ContentScaling = 'xs' | 'sm' | 'md';
 
 export function adjustContentScaling(scaling: ContentScaling, offset?: number) {
   if (!offset) return scaling;
@@ -186,7 +175,6 @@ interface ContentScalingOptions {
   blockLineHeight: string | number;
   // ChatMessage
   chatMessagePadding: number;
-  fragmentButtonFontSize: string;
   // ChatDrawer
   chatDrawerItemSx: { '--ListItem-minHeight': string, fontSize: string };
   chatDrawerItemFolderSx: { '--ListItem-minHeight': string, fontSize: string };
@@ -199,8 +187,7 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockFontSize: 'xs',
     blockImageGap: 1,
     blockLineHeight: 1.666667,
-    chatMessagePadding: 1,
-    fragmentButtonFontSize: 'xs',
+    chatMessagePadding: 1.25,
     chatDrawerItemSx: { '--ListItem-minHeight': '2.25rem', fontSize: 'sm' },          // 36px
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'sm' },     // 40px
   },
@@ -211,7 +198,6 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockImageGap: 1.5,
     blockLineHeight: 1.714286,
     chatMessagePadding: 1.5,
-    fragmentButtonFontSize: 'sm',
     chatDrawerItemSx: { '--ListItem-minHeight': '2.25rem', fontSize: 'sm' },
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'sm' },
   },
@@ -222,7 +208,6 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
     blockImageGap: 2,
     blockLineHeight: 1.75,
     chatMessagePadding: 2,
-    fragmentButtonFontSize: 'sm',
     chatDrawerItemSx: { '--ListItem-minHeight': '2.5rem', fontSize: 'md' },           // 40px
     chatDrawerItemFolderSx: { '--ListItem-minHeight': '2.75rem', fontSize: 'md' },    // 44px
   },
@@ -237,7 +222,7 @@ export const themeScalingMap: Record<ContentScaling, ContentScalingOptions> = {
 const isBrowser = typeof document !== 'undefined';
 
 export function createEmotionCache() {
-  let insertionPoint: HTMLElement | undefined;
+  let insertionPoint;
 
   if (isBrowser) {
     // On the client side, _document.tsx has a meta tag with the name "emotion-insertion-point" at the top of the <head>.
@@ -248,7 +233,7 @@ export function createEmotionCache() {
     insertionPoint = emotionInsertionPoint ?? undefined;
   }
 
-  return createCache({ key: 'mui-style', insertionPoint: insertionPoint });
+  return createCache({ key: 'mui-style', insertionPoint });
 }
 
 // MISC

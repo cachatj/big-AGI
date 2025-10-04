@@ -1,93 +1,95 @@
 import * as React from 'react';
+import { shallow } from 'zustand/shallow';
 
 import { Box, Checkbox, Divider } from '@mui/joy';
 
-import type { DModelsService, DModelsServiceId } from '~/common/stores/llms/modelsservice.types';
-import { GoodModal } from '~/common/components/modals/GoodModal';
-import { llmsStoreState } from '~/common/stores/llms/store-llms';
-import { optimaActions, optimaOpenModels, useOptimaModelsModalsState } from '~/common/layout/optima/useOptima';
+import { GoodModal } from '~/common/components/GoodModal';
 import { runWhenIdle } from '~/common/util/pwaUtils';
-import { useLLMsCount, useModelsServices } from '~/common/stores/llms/llms.hooks';
+import { useOptimaLayout } from '~/common/layout/optima/useOptimaLayout';
+
+import { DModelSource, DModelSourceId, useModelsStore } from '../store-llms';
+import { createModelSourceForDefaultVendor, findVendorById } from '../vendors/vendors.registry';
 
 import { LLMOptionsModal } from './LLMOptionsModal';
 import { ModelsList } from './ModelsList';
-import { ModelsServiceSelector } from './ModelsServiceSelector';
-import { createModelsServiceForDefaultVendor } from '../vendors/vendor.helpers';
-import { findModelVendor } from '../vendors/vendors.registry';
+import { ModelsSourceSelector } from './ModelsSourceSelector';
 
 
-function VendorServiceSetup(props: { service: DModelsService }) {
-  const vendor = findModelVendor(props.service.vId);
+function VendorSourceSetup(props: { source: DModelSource }) {
+  const vendor = findVendorById(props.source.vId);
   if (!vendor)
-    return 'Configuration issue: Vendor not found for Service ' + props.service.id;
-  return <vendor.ServiceSetupComponent key={props.service.id} serviceId={props.service.id} />;
+    return 'Configuration issue: Vendor not found for Source ' + props.source.id;
+  return <vendor.SourceSetupComponent key={props.source.id} sourceId={props.source.id} />;
 }
 
 
 export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
   // local state
-  const [_selectedServiceId, setSelectedServiceId] = React.useState<DModelsServiceId | null>(null);
-  const [showAllServices, setShowAllServices] = React.useState<boolean>(false);
+  const [_selectedSourceId, setSelectedSourceId] = React.useState<DModelSourceId | null>(null);
+  const [showAllSources, setShowAllSources] = React.useState<boolean>(false);
 
   // external state
-  const { showModels, showModelOptions } = useOptimaModelsModalsState();
-  const modelsServices = useModelsServices();
-  const llmCount = useLLMsCount();
+  const {
+    closeLlmOptions, closeModelsSetup,
+    openLlmOptions, openModelsSetup,
+    showLlmOptions, showModelsSetup,
+  } = useOptimaLayout();
+  const { modelSources, llmCount } = useModelsStore(state => ({
+    modelSources: state.sources,
+    llmCount: state.llms.length,
+  }), shallow);
 
-  // auto-select the first service - note: we could use a useEffect() here, but this is more efficient
+  // auto-select the first source - note: we could use a useEffect() here, but this is more efficient
   // also note that state-persistence is unneeded
-  const selectedServiceId = _selectedServiceId ?? modelsServices[modelsServices.length - 1]?.id ?? null;
+  const selectedSourceId = _selectedSourceId ?? modelSources[modelSources.length - 1]?.id ?? null;
 
-  const activeService = modelsServices.find(s => s.id === selectedServiceId);
+  const activeSource = modelSources.find(source => source.id === selectedSourceId);
 
-  const multiService = modelsServices.length > 1;
+  const multiSource = modelSources.length > 1;
 
-  // Auto-open this dialog - anytime no service is selected
-  const autoOpenTrigger = !selectedServiceId && !props.suspendAutoModelsSetup;
+  // Auto-open this dialog - anytime no source is selected
+  const autoOpenTrigger = !selectedSourceId && !props.suspendAutoModelsSetup;
   React.useEffect(() => {
     if (autoOpenTrigger)
-      return runWhenIdle(() => optimaOpenModels(), 2000);
-  }, [autoOpenTrigger]);
+      return runWhenIdle(openModelsSetup, 2000);
+  }, [autoOpenTrigger, openModelsSetup]);
 
-  // Auto-add the default service - at boot, when no service is present
-  const autoAddTrigger = showModels && !props.suspendAutoModelsSetup;
+  // Auto-add the default source - at boot, when no source is present
+  const autoAddTrigger = showModelsSetup && !props.suspendAutoModelsSetup;
   React.useEffect(() => {
     // Note: we use the immediate version to not react to deletions
-    const { addService, sources: modelsServices } = llmsStoreState();
-    if (autoAddTrigger && !modelsServices.length)
-      addService(createModelsServiceForDefaultVendor(modelsServices));
+    const { addSource, sources } = useModelsStore.getState();
+    if (autoAddTrigger && !sources.length)
+      addSource(createModelSourceForDefaultVendor(sources));
   }, [autoAddTrigger]);
 
 
   return <>
 
-    {/* Services Setup */}
-    {showModels && <GoodModal
+    {/* Sources Setup */}
+    {showModelsSetup && <GoodModal
       title={<>Configure <b>AI Models</b></>}
-      open onClose={optimaActions().closeModels}
-      animateEnter={llmCount === 0}
-      unfilterBackdrop
       startButton={
-        multiService ? <Checkbox
-          label='All Services'
-          sx={{ my: 'auto' }}
-          checked={showAllServices} onChange={() => setShowAllServices(all => !all)}
+        multiSource ? <Checkbox
+          label='All Services' sx={{ my: 'auto' }}
+          checked={showAllSources} onChange={() => setShowAllSources(all => !all)}
         /> : undefined
       }
+      open onClose={closeModelsSetup}
       sx={{
         // forces some shrinkage of the contents (ModelsList)
         overflow: 'auto',
       }}
     >
 
-      <ModelsServiceSelector selectedServiceId={selectedServiceId} setSelectedServiceId={setSelectedServiceId} />
+      <ModelsSourceSelector selectedSourceId={selectedSourceId} setSelectedSourceId={setSelectedSourceId} />
 
-      {!!activeService && <Divider />}
+      {!!activeSource && <Divider />}
 
-      {!!activeService && (
+      {!!activeSource && (
         <Box sx={{ display: 'grid', gap: 'var(--Card-padding)' }}>
-          <VendorServiceSetup service={activeService} />
+          <VendorSourceSetup source={activeSource} />
         </Box>
       )}
 
@@ -95,8 +97,8 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
 
       {!!llmCount && (
         <ModelsList
-          filterServiceId={showAllServices ? null : selectedServiceId}
-          onOpenLLMOptions={optimaActions().openModelOptions}
+          filterSourceId={showAllSources ? null : selectedSourceId}
+          onOpenLLMOptions={openLlmOptions}
           sx={{
             // works in tandem with the parent (GoodModal > Dialog) overflow: 'auto'
             minHeight: '6rem',
@@ -122,9 +124,7 @@ export function ModelsModal(props: { suspendAutoModelsSetup?: boolean }) {
     </GoodModal>}
 
     {/* per-LLM options */}
-    {!!showModelOptions && (
-      <LLMOptionsModal id={showModelOptions} onClose={optimaActions().closeModelOptions} />
-    )}
+    {!!showLlmOptions && <LLMOptionsModal id={showLlmOptions} onClose={closeLlmOptions} />}
 
   </>;
 }

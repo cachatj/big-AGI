@@ -13,11 +13,10 @@ export function FormSwitchControl(props: {
   on?: string, off?: string, fullWidth?: boolean,
   checked: boolean, onChange: (on: boolean) => void,
   disabled?: boolean,
-  tooltip?: React.ReactNode,
 }) {
   return (
     <FormControl orientation='horizontal' disabled={props.disabled} sx={{ flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center' }}>
-      <FormLabelStart title={props.title} description={props.description} tooltip={props.tooltip} />
+      <FormLabelStart title={props.title} description={props.description} />
       <Switch
         checked={props.checked}
         onChange={event => props.onChange(event.target.checked)}

@@ -15,7 +15,6 @@ export const env = createEnv({
     // Backend MongoDB, for a more complete developer data platform.
     MDB_URI: z.string().optional(),
 
-
     // LLM: OpenAI
     OPENAI_API_KEY: z.string().optional(),
     OPENAI_API_HOST: z.string().url().optional(),
@@ -28,9 +27,6 @@ export const env = createEnv({
     // LLM: Anthropic
     ANTHROPIC_API_KEY: z.string().optional(),
     ANTHROPIC_API_HOST: z.string().url().optional(),
-
-    // LLM: Deepseek AI
-    DEEPSEEK_API_KEY: z.string().optional(),
 
     // LLM: Google AI's Gemini
     GEMINI_API_KEY: z.string().optional(),
@@ -48,48 +44,41 @@ export const env = createEnv({
     // LLM: Ollama
     OLLAMA_API_HOST: z.string().url().optional(),
 
-    // LLM: OpenPipe
-    OPENPIPE_API_KEY: z.string().optional(),
-
     // LLM: OpenRouter
     OPENROUTER_API_KEY: z.string().optional(),
 
     // LLM: Perplexity
     PERPLEXITY_API_KEY: z.string().optional(),
 
-    // LLM: Together AI
+    // LLM: Toghether AI
     TOGETHERAI_API_KEY: z.string().optional(),
-
-    // LLM: xAI
-    XAI_API_KEY: z.string().optional(),
-
 
     // Helicone - works on both OpenAI and Anthropic vendors
     HELICONE_API_KEY: z.string().optional(),
 
+    // ElevenLabs - speech.ts
+    ELEVENLABS_API_KEY: z.string().optional(),
+    ELEVENLABS_API_HOST: z.string().url().optional(),
+    ELEVENLABS_VOICE_ID: z.string().optional(),
 
-    // Browsing Service
-    PUPPETEER_WSS_ENDPOINT: z.string().url().optional(),
+    // Prodia
+    PRODIA_API_KEY: z.string().optional(),
 
     // Google Custom Search
     GOOGLE_CLOUD_API_KEY: z.string().optional(),
     GOOGLE_CSE_ID: z.string().optional(),
 
+    // Browsing Service
+    PUPPETEER_WSS_ENDPOINT: z.string().url().optional(),
 
-    // Text-To-Speech: ElevenLabs - speech.ts
-    ELEVENLABS_API_KEY: z.string().optional(),
-    ELEVENLABS_API_HOST: z.string().url().optional(),
-    ELEVENLABS_VOICE_ID: z.string().optional(),
-
-    // Text-To-Image: Prodia
-    PRODIA_API_KEY: z.string().optional(),
-
+    // Backend: Analytics flags (e.g. which hostname responds) for managed installs
+    BACKEND_ANALYTICS: z.string().optional().transform(list => (list || '').split(';').filter(flag => !!flag)),
 
     // Backend: HTTP Basic Authentication
     HTTP_BASIC_AUTH_USERNAME: z.string().optional(),
     HTTP_BASIC_AUTH_PASSWORD: z.string().optional(),
 
-    // Build-time configuration (ignore)
+    // Build-time configuration
     BIG_AGI_BUILD: z.enum(['standalone', 'static']).optional(),
 
   },

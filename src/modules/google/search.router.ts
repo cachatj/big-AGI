@@ -1,11 +1,18 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-import { createTRPCRouter, publicProcedure } from '~/server/trpc/trpc.server';
+import { createTRPCRouter, publicProcedure } from '~/server/api/trpc.server';
 import { env } from '~/server/env.mjs';
-import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
+import { fetchJsonOrTRPCError } from '~/server/api/trpc.router.fetchers';
 
 import { Search } from './search.types';
+
+
+const inputSchema = z.object({
+  query: z.string(),
+  key: z.string().optional(), // could be server-set
+  cx: z.string().optional(), // could be server-set
+});
 
 
 export const googleSearchRouter = createTRPCRouter({
@@ -14,42 +21,21 @@ export const googleSearchRouter = createTRPCRouter({
    * Google Search via the Google Programmable Search product
    */
   search: publicProcedure
-    .input(z.object({
-      query: z.string(),
-      items: z.number(),
-      key: z.string().optional(), // could be server-set
-      cx: z.string().optional(), // could be server-set
-      restrictToDomain: z.string().nullable(),
-    }))
+    .input(inputSchema)
     .query(async ({ input }): Promise<{ pages: Search.API.BriefResult[] }> => {
 
       const customSearchParams: Search.Wire.RequestParams = {
         q: input.query.trim(),
         cx: (input.cx || env.GOOGLE_CSE_ID || '').trim(),
         key: (input.key || env.GOOGLE_CLOUD_API_KEY || '').trim(),
-        num: input.items,
+        num: 5,
       };
-
-      // add domain restriction if provided
-      if (input.restrictToDomain) {
-        customSearchParams.siteSearch = input.restrictToDomain.trim();
-        customSearchParams.siteSearchFilter = 'i'; // 'i' to include only these results (vs 'e' to exclude)
-      }
 
       if (!customSearchParams.key || !customSearchParams.cx)
         throw new Error('Missing API Key or Custom Search Engine ID');
 
       const url = `https://www.googleapis.com/customsearch/v1?${objectToQueryString(customSearchParams)}`;
-      const data: Search.Wire.SearchResponse & { error?: { message?: string } } = await fetchJsonOrTRPCThrow({
-        url,
-        name: 'Google Custom Search',
-        headers: {
-          'Accept': 'application/json',
-          'Accept-Encoding': 'gzip',
-          'User-Agent': 'Big-AGI (gzip)',
-        },
-      });
-
+      const data: Search.Wire.SearchResponse & { error?: { message?: string } } = await fetchJsonOrTRPCError(url, 'GET', {}, undefined, 'Google Custom Search');
       if (data.error)
         throw new TRPCError({
           code: 'BAD_REQUEST',

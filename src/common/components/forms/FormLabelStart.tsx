@@ -1,19 +1,20 @@
 import * as React from 'react';
 
-import type { SxProps } from '@mui/joy/styles/types';
 import { FormHelperText, FormLabel } from '@mui/joy';
+import { SxProps } from '@mui/joy/styles/types';
 import InfoIcon from '@mui/icons-material/Info';
 
 import { GoodTooltip } from '~/common/components/GoodTooltip';
+import { formLabelStartWidth } from '~/common/app.theme';
 
 
 /**
  * Shared label part (left side)
  */
 const FormLabelStartBase = (props: {
-  title: React.ReactNode,
-  description?: React.ReactNode,
-  tooltip?: React.ReactNode,
+  title: string | React.JSX.Element,
+  description?: string | React.JSX.Element
+  tooltip?: string | React.JSX.Element,
   onClick?: (event: React.MouseEvent) => void,
   sx?: SxProps,
 }) =>
@@ -22,15 +23,13 @@ const FormLabelStartBase = (props: {
     <FormLabel
       onClick={props.onClick}
       sx={{
-        // minWidth: formLabelStartWidth,
-        flexWrap: 'nowrap',
-        whiteSpace: 'nowrap',
+        minWidth: formLabelStartWidth,
         ...(!!props.onClick && { cursor: 'pointer', textDecoration: 'underline' }),
         ...props.sx,
       }}
     >
-      {props.title} {!!props.tooltip && (
-      <GoodTooltip title={props.tooltip} arrow placement='top'>
+      {props.title} {props.tooltip && (
+      <GoodTooltip title={props.tooltip}>
         <InfoIcon sx={{ ml: 0.5, cursor: 'pointer', fontSize: 'md', color: 'primary.solidBg' }} />
       </GoodTooltip>
     )}

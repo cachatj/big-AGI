@@ -6,10 +6,8 @@ import TelegramIcon from '@mui/icons-material/Telegram';
 
 import { ChatMessageMemo } from '../../../apps/chat/components/message/ChatMessage';
 
-import { findModelVendor } from '~/modules/llms/vendors/vendors.registry';
-
-import { findLLMOrThrow } from '~/common/stores/llms/store-llms';
-import { messageFragmentsReduceText } from '~/common/stores/chat/chat.message';
+import { findLLMOrThrow } from '~/modules/llms/store-llms';
+import { findVendorById } from '~/modules/llms/vendors/vendors.registry';
 
 import { GoodTooltip } from '~/common/components/GoodTooltip';
 import { InlineError } from '~/common/components/InlineError';
@@ -24,13 +22,11 @@ import { GATHER_COLOR } from '../beam.config';
 import { findFusionFactory } from './instructions/beam.gather.factories';
 import { fusionIsEditable, fusionIsError, fusionIsFusing, fusionIsIdle, fusionIsStopped, fusionIsUsableOutput } from './beam.gather';
 import { useBeamCardScrolling } from '../store-module-beam';
-import { useMessageAvatarLabel } from '~/common/util/dMessageUtils';
 
 
 export function Fusion(props: {
   beamStore: BeamStoreApi,
   fusionId: string,
-  isMobile: boolean,
 }) {
 
   // external state
@@ -45,7 +41,6 @@ export function Fusion(props: {
   const isStopped = fusionIsStopped(fusion);
   const isUsable = fusionIsUsableOutput(fusion);
   const showUseButtons = isUsable && !isFusing;
-  const { tooltip: fusionAvatarTooltip } = useMessageAvatarLabel(fusion?.outputDMessage, 'pro');
 
   const factory = findFusionFactory(fusion?.factoryId);
 
@@ -60,7 +55,7 @@ export function Fusion(props: {
         const llm = findLLMOrThrow(llmId);
         return {
           llmLabel: llm.label,
-          llmVendorIcon: findModelVendor(llm.vId)?.Icon,
+          llmVendorIcon: findVendorById(llm._source?.vId)?.Icon,
         };
       } catch (e) {
       }
@@ -70,19 +65,19 @@ export function Fusion(props: {
 
 
   // handlers
-  const handleFusionCopyToClipboard = React.useCallback(() => {
+  const handleFusionCopy = React.useCallback(() => {
     const { fusions } = props.beamStore.getState();
     const fusion = fusions.find(fusion => fusion.fusionId === props.fusionId);
-    if (fusion?.outputDMessage?.fragments.length)
-      copyToClipboard(messageFragmentsReduceText(fusion.outputDMessage.fragments), 'Merge');
+    if (fusion?.outputDMessage?.text)
+      copyToClipboard(fusion.outputDMessage.text, 'Merge');
   }, [props.beamStore, props.fusionId]);
 
   const handleFusionUse = React.useCallback(() => {
     // get snapshot values, so we don't have to react to the hook
     const { fusions, onSuccessCallback } = props.beamStore.getState();
     const fusion = fusions.find(fusion => fusion.fusionId === props.fusionId);
-    if (fusion?.outputDMessage?.fragments.length && onSuccessCallback)
-      onSuccessCallback(fusion.outputDMessage);
+    if (fusion?.outputDMessage?.text && onSuccessCallback)
+      onSuccessCallback(fusion.outputDMessage.text, fusion.llmId || '');
   }, [props.beamStore, props.fusionId]);
 
 
@@ -100,8 +95,6 @@ export function Fusion(props: {
 
   return (
     <BeamCard
-      role='beam-card'
-      tabIndex={-1}
       className={
         // (isIdle ? beamCardClasses.fusionIdle : '')
         (isError ? beamCardClasses.errored + ' ' : '')
@@ -117,11 +110,9 @@ export function Fusion(props: {
         factory={factory}
         isFusing={isFusing}
         isInterrupted={isStopped}
-        isMobile={props.isMobile}
         isUsable={isUsable}
         llmLabel={llmLabel}
         llmVendorIcon={llmVendorIcon}
-        fusionAvatarTooltip={fusionAvatarTooltip}
         onRemove={handleFusionRemove}
         onToggleGenerate={handleToggleFusionGather}
       />
@@ -146,15 +137,14 @@ export function Fusion(props: {
       {!!fusion?.fusingInstructionComponent && fusion.fusingInstructionComponent}
 
       {/* Output Message */}
-      {(!!fusion?.outputDMessage?.fragments.length || fusion?.stage === 'fusing') && (
+      {(!!fusion?.outputDMessage?.text || fusion?.stage === 'fusing') && (
         <Box sx={beamCardMessageWrapperSx}>
           {!!fusion.outputDMessage && (
             <ChatMessageMemo
               message={fusion.outputDMessage}
               fitScreen={true}
-              isMobile={props.isMobile}
-              hideAvatar
-              showUnsafeHtmlCode={true}
+              showAvatar={false}
+              showUnsafeHtml={true}
               adjustContentScaling={-1}
               sx={!cardScrolling ? beamCardMessageSx : beamCardMessageScrollingSx}
             />
@@ -170,7 +160,7 @@ export function Fusion(props: {
           {/* Copy */}
           <GoodTooltip title='Copy'>
             <IconButton
-              onClick={handleFusionCopyToClipboard}
+              onClick={handleFusionCopy}
             >
               <ContentCopyIcon sx={{ fontSize: 'md' }} />
             </IconButton>

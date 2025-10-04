@@ -3,16 +3,17 @@ import { OpenRouterIcon } from '~/common/components/icons/vendors/OpenRouterIcon
 import type { IModelVendor } from '../IModelVendor';
 import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
 
-import { ModelVendorOpenAI } from '../openai/openai.vendor';
+import { LLMOptionsOpenAI, ModelVendorOpenAI } from '../openai/openai.vendor';
+import { OpenAILLMOptions } from '../openai/OpenAILLMOptions';
 
-import { OpenRouterServiceSetup } from './OpenRouterServiceSetup';
+import { OpenRouterSourceSetup } from './OpenRouterSourceSetup';
 
 
 // special symbols
 export const isValidOpenRouterKey = (apiKey?: string) => !!apiKey && apiKey.startsWith('sk-or-') && apiKey.length > 40;
 
 // use OpenAI-compatible host and key
-export interface DOpenRouterServiceSettings {
+export interface SourceSetupOpenRouter {
   oaiKey: string;
   oaiHost: string;
 }
@@ -28,10 +29,10 @@ export interface DOpenRouterServiceSettings {
  *  [x] decide whether to do UI work to improve the appearance - prioritized models
  *  [x] works!
  */
-export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, OpenAIAccessSchema> = {
+export const ModelVendorOpenRouter: IModelVendor<SourceSetupOpenRouter, OpenAIAccessSchema, LLMOptionsOpenAI> = {
   id: 'openrouter',
   name: 'OpenRouter',
-  displayRank: 40,
+  rank: 12,
   location: 'cloud',
   instanceLimit: 1,
   hasFreeModels: true,
@@ -39,10 +40,11 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
 
   // components
   Icon: OpenRouterIcon,
-  ServiceSetupComponent: OpenRouterServiceSetup,
+  SourceSetupComponent: OpenRouterSourceSetup,
+  LLMOptionsComponent: OpenAILLMOptions,
 
   // functions
-  initializeSetup: (): DOpenRouterServiceSettings => ({
+  initializeSetup: (): SourceSetupOpenRouter => ({
     oaiHost: 'https://openrouter.ai/api',
     oaiKey: '',
   }),
@@ -56,26 +58,27 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
   }),
 
   // there is delay for OpenRouter Free API calls
-  rateLimitChatGenerate: async (llm) => {
+  getRateLimitDelay: (llm) => {
     const now = Date.now();
     const elapsed = now - nextGenerationTs;
-    const wait = llm.pricing?.chat?._isFree
+    const wait = llm.tmpIsFree
       ? 5000 + 100 /* 5 seconds for free call, plus some safety margin */
       : 100;
 
     if (elapsed < wait) {
       const delay = wait - elapsed;
       nextGenerationTs = now + delay;
-      await new Promise(resolve => setTimeout(resolve, delay));
+      return delay;
     } else {
       nextGenerationTs = now;
+      return 0;
     }
   },
 
-
   // OpenAI transport ('openrouter' dialect in 'access')
   rpcUpdateModelsOrThrow: ModelVendorOpenAI.rpcUpdateModelsOrThrow,
-
+  rpcChatGenerateOrThrow: ModelVendorOpenAI.rpcChatGenerateOrThrow,
+  streamingChatGenerateOrThrow: ModelVendorOpenAI.streamingChatGenerateOrThrow,
 };
 
 // rate limit timestamp

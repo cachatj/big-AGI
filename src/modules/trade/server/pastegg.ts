@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { fetchJsonOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
+import { fetchJsonOrTRPCError } from '~/server/api/trpc.router.fetchers';
 
 
 export const publishToInputSchema = z.object({
@@ -55,13 +55,7 @@ export async function postToPasteGGOrThrow(title: string, fileName: string, file
     }],
   };
 
-  return await fetchJsonOrTRPCThrow<PasteGGWire.PasteResponse, PasteGGWire.PasteRequest>({
-    url: 'https://api.paste.gg/v1/pastes',
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: pasteData,
-    name: 'PasteGG',
-  });
+  return await fetchJsonOrTRPCError<PasteGGWire.PasteResponse, PasteGGWire.PasteRequest>('https://api.paste.gg/v1/pastes', 'POST', { 'Content-Type': 'application/json' }, pasteData, 'PasteGG');
 }
 
 

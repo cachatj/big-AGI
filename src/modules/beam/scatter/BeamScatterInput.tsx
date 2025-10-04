@@ -5,9 +5,7 @@ import { Box, Typography } from '@mui/joy';
 
 import { ChatMessageMemo } from '../../../apps/chat/components/message/ChatMessage';
 
-import type { DMessage, DMessageId } from '~/common/stores/chat/chat.message';
-import type { DMessageFragment, DMessageFragmentId } from '~/common/stores/chat/chat.fragments';
-import { hasSystemMessageInHistory } from '~/common/stores/chat/chat.conversation';
+import type { DMessage } from '~/common/state/store-chats';
 
 import { BEAM_INVERT_BACKGROUND } from '../beam.config';
 import { useModuleBeamStore } from '../store-module-beam';
@@ -31,11 +29,10 @@ const userMessageWrapperINVSx: SxProps = {
 };
 
 const userChatMessageSx: SxProps = {
-  border: 'none',
-  // border: '1px solid',
-  // borderBottom: 'none',
-  // borderColor: 'primary.outlinedBorder',
+  border: '1px solid',
+  borderColor: 'primary.outlinedBorder',
   borderRadius: 'md',
+  borderBottom: 'none',
   borderBottomLeftRadius: 0,
   borderBottomRightRadius: 0,
   // px: '0.5rem',
@@ -51,7 +48,7 @@ const userChatMessageSx: SxProps = {
 export function BeamScatterInput(props: {
   isMobile: boolean,
   history: DMessage[] | null,
-  onMessageFragmentReplace: (messageId: DMessageId, fragmentId: DMessageFragmentId, newFragment: DMessageFragment) => void,
+  editHistory: (messageId: string, newText: string) => void,
 }) {
 
   // state
@@ -64,7 +61,7 @@ export function BeamScatterInput(props: {
 
   const lastHistoryMessage = props.history?.slice(-1)[0] || null;
 
-  const isFirstMessageSystem = hasSystemMessageInHistory(props.history || []);
+  const isFirstMessageSystem = props.history?.[0]?.role === 'system';
 
   const otherHistoryCount = Math.max(0, (props.history?.length || 0) - 1);
 
@@ -91,10 +88,10 @@ export function BeamScatterInput(props: {
       <ChatMessageMemo
         message={lastHistoryMessage}
         fitScreen={props.isMobile}
-        isMobile={props.isMobile}
+        showAvatar={true}
         adjustContentScaling={-1}
         topDecorator={userMessageDecorator}
-        onMessageFragmentReplace={props.onMessageFragmentReplace}
+        onMessageEdit={props.editHistory}
         sx={userChatMessageSx}
       />
     </Box>

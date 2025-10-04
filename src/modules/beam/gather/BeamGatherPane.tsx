@@ -81,9 +81,8 @@ export function BeamGatherPane(props: {
     setCurrentGatherLlmId: state.setCurrentGatherLlmId,
   })));
   const gatherAutoStartAfterScatter = useModuleBeamStore(state => state.gatherAutoStartAfterScatter);
-  const disableUnlessAutoStart = !props.canGather && !gatherAutoStartAfterScatter;
   const [_, gatherLlmComponent/*, gatherLlmIcon*/] = useLLMSelect(
-    currentGatherLlmId, setCurrentGatherLlmId, props.isMobile ? '' : 'Merge Model', true, disableUnlessAutoStart,
+    currentGatherLlmId, setCurrentGatherLlmId, props.isMobile ? '' : 'Merge Model', true, !props.canGather && !gatherAutoStartAfterScatter,
   );
 
   // derived state
@@ -129,7 +128,7 @@ export function BeamGatherPane(props: {
         <ButtonGroup
           variant='outlined'
           size='md'
-          disabled={disableUnlessAutoStart}
+          disabled={!props.canGather}
           // sx={{ boxShadow: isNoFactorySelected ? 'xs' : undefined }}
         >
           {FUSION_FACTORIES.map(factory => {

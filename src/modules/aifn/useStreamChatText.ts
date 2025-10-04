@@ -1,15 +1,9 @@
 import * as React from 'react';
 
-import type { AixAPI_Context_ChatGenerate } from '~/modules/aix/server/api/aix.wiretypes';
-import type { AixChatGenerate_TextMessages } from '~/modules/aix/client/aix.client.chatGenerateRequest';
-import { aixChatGenerateText_Simple } from '~/modules/aix/client/aix.client';
-
-import type { DLLMId } from '~/common/stores/llms/llms.types';
+import type { DLLMId } from '~/modules/llms/store-llms';
+import { llmStreamingChatGenerate, VChatContextRef, VChatMessageIn, VChatStreamContextName } from '~/modules/llms/llm.client';
 
 
-/**
- * NOTE: we shall rename this to useAgiStreamChatText or similar, but let's not conclict already.
- */
 export function useStreamChatText() {
 
   // state
@@ -19,7 +13,7 @@ export function useStreamChatText() {
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
 
-  const startStreaming = React.useCallback(async (llmId: DLLMId, systemInstructionText: string, aixChatGenerate_TextMessages: AixChatGenerate_TextMessages, aixContextName: AixAPI_Context_ChatGenerate['name'], aixContextRef: AixAPI_Context_ChatGenerate['ref']) => {
+  const startStreaming = React.useCallback(async (llmId: DLLMId, prompt: VChatMessageIn[], contextName: VChatStreamContextName, contextRef: VChatContextRef) => {
     setStreamError(null);
     setPartialText(null);
     setText(null);
@@ -29,20 +23,15 @@ export function useStreamChatText() {
     abortControllerRef.current = new AbortController();
 
     try {
-
-      const finalText = await aixChatGenerateText_Simple(
-        llmId,
-        systemInstructionText,
-        aixChatGenerate_TextMessages,
-        aixContextName,
-        aixContextRef,
-        { abortSignal: abortControllerRef.current.signal },
-        setPartialText,
-      );
-
-      // since streamChat has finished, we can assume the stream is complete
-      setText(finalText);
-
+      let lastText = '';
+      await llmStreamingChatGenerate(llmId, prompt, contextName, contextRef, null, null, abortControllerRef.current.signal, ({ textSoFar }) => {
+        if (textSoFar) {
+          lastText = textSoFar;
+          setPartialText(lastText);
+        }
+      });
+      // Since streamChat has finished, we can assume the stream is complete
+      setText(lastText);
     } catch (error: any) {
       setStreamError(error?.name !== 'AbortError'
         ? error?.message || error?.toString() || JSON.stringify(error) || 'Unknown error'

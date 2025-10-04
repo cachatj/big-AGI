@@ -9,7 +9,6 @@ import LaunchIcon from '@mui/icons-material/Launch';
 import { Brand } from '~/common/app.config';
 import { Link } from '~/common/components/Link';
 import { ROUTE_INDEX } from '~/common/app.routes';
-import { Release } from '~/common/app.release';
 import { animationColorBlues, animationColorRainbow } from '~/common/util/animUtils';
 import { capitalizeFirstLetter } from '~/common/util/textUtils';
 
@@ -22,8 +21,6 @@ import { bigAgi2NewsCallout } from './bigAgi2.data';
 const NEWS_INITIAL_COUNT = 3;
 const NEWS_LOAD_STEP = 2;
 
-
-const _frontendBuild = Release.buildInfo('frontend');
 
 export const newsRoadmapCallout =
   <Card variant='solid' invertedColors>
@@ -146,9 +143,7 @@ export function AppNews() {
                       </Box>
                     </Typography>
                     <Typography level='body-sm' sx={{ ml: 'auto' }}>
-                      {idx === 0 && _frontendBuild.timestamp
-                        ? <TimeAgo date={_frontendBuild.timestamp} />
-                        : !!ni.versionDate && <TimeAgo date={ni.versionDate} />}
+                      {!!ni.versionDate && <TimeAgo date={ni.versionDate} />}
                     </Typography>
                   </Box>
 

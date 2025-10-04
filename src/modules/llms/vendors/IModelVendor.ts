@@ -4,40 +4,60 @@ import type { SvgIconProps } from '@mui/joy';
 
 import type { BackendCapabilities } from '~/modules/backend/store-backend-capabilities';
 
-import type { DLLM } from '~/common/stores/llms/llms.types';
-import type { DModelsServiceId } from '~/common/stores/llms/modelsservice.types';
-
+import type { DLLM, DLLMId, DModelSourceId } from '../store-llms';
 import type { ModelDescriptionSchema } from '../server/llm.server.types';
 import type { ModelVendorId } from './vendors.registry';
+import type { StreamingClientUpdate } from './unifiedStreamingClient';
+import type { VChatContextRef, VChatFunctionIn, VChatGenerateContextName, VChatMessageIn, VChatMessageOrFunctionCallOut, VChatMessageOut, VChatStreamContextName } from '../llm.client';
 
 
-export interface IModelVendor<TServiceSettings extends Record<string, any> = {}, TAccess = unknown> {
+export interface IModelVendor<TSourceSetup = unknown, TAccess = unknown, TLLMOptions = unknown, TDLLM = DLLM<TSourceSetup, TLLMOptions>> {
   readonly id: ModelVendorId;
   readonly name: string;
-  readonly displayRank: number; // [10...] Foundation Models, [30...] 3rd party Clouds, [40...] Aggregators, [50...] Local Models
+  readonly rank: number;
   readonly location: 'local' | 'cloud';
-  readonly brandColor?: string;
-  readonly instanceLimit?: number;
+  readonly instanceLimit: number;
   readonly hasFreeModels?: boolean;
-  readonly hasBackendCapFn?: (backendCapabilities: BackendCapabilities) => boolean; // used to show a 'green checkmark' in the list of vendors when adding services
+  readonly hasBackendCapFn?: (backendCapabilities: BackendCapabilities) => boolean; // used to show a 'geen checkmark' in the list of vendors when adding sources
   readonly hasBackendCapKey?: keyof BackendCapabilities;
 
   // components
   readonly Icon: React.FunctionComponent<SvgIconProps>;
-  readonly ServiceSetupComponent: React.ComponentType<{ serviceId: DModelsServiceId }>;
+  readonly SourceSetupComponent: React.ComponentType<{ sourceId: DModelSourceId }>;
+  readonly LLMOptionsComponent: React.ComponentType<{ llm: TDLLM }>;
 
   /// abstraction interface ///
 
-  initializeSetup?(): TServiceSettings;
+  initializeSetup?(): TSourceSetup;
 
-  validateSetup?(setup: TServiceSettings): boolean; // client-side only, accessed via useServiceSetup
+  validateSetup?(setup: TSourceSetup): boolean; // client-side only, accessed via useSourceSetup
 
-  getTransportAccess(setup?: Partial<TServiceSettings>): TAccess;
+  getTransportAccess(setup?: Partial<TSourceSetup>): TAccess;
 
-  rateLimitChatGenerate?(llm: DLLM, setup: Partial<TServiceSettings>): Promise<void>;
+  getRateLimitDelay?(llm: TDLLM, setup: Partial<TSourceSetup>): number;
 
-  rpcUpdateModelsOrThrow(
+  rpcUpdateModelsOrThrow: (
     access: TAccess,
-  ): Promise<{ models: ModelDescriptionSchema[] }>;
+  ) => Promise<{ models: ModelDescriptionSchema[] }>;
+
+  rpcChatGenerateOrThrow: (
+    access: TAccess,
+    llmOptions: TLLMOptions,
+    messages: VChatMessageIn[],
+    contextName: VChatGenerateContextName, contextRef: VChatContextRef | null,
+    functions: VChatFunctionIn[] | null, forceFunctionName: string | null,
+    maxTokens?: number,
+  ) => Promise<VChatMessageOut | VChatMessageOrFunctionCallOut>;
+
+  streamingChatGenerateOrThrow: (
+    access: TAccess,
+    llmId: DLLMId,
+    llmOptions: TLLMOptions,
+    messages: VChatMessageIn[],
+    contextName: VChatStreamContextName, contextRef: VChatContextRef,
+    functions: VChatFunctionIn[] | null, forceFunctionName: string | null,
+    abortSignal: AbortSignal,
+    onUpdate: (update: StreamingClientUpdate, done: boolean) => void,
+  ) => Promise<void>;
 
 }

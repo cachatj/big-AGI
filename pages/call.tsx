@@ -2,7 +2,9 @@ import * as React from 'react';
 
 import { AppCall } from '../src/apps/call/AppCall';
 
-import { withNextJSPerPageLayout } from '~/common/layout/withLayout';
+import { withLayout } from '~/common/layout/withLayout';
 
 
-export default withNextJSPerPageLayout({ type: 'optima' }, () => <AppCall />);
+export default function CallPage() {
+  return withLayout({ type: 'optima' }, <AppCall />);
+}

@@ -3,20 +3,21 @@ import { LocalAIIcon } from '~/common/components/icons/vendors/LocalAIIcon';
 import type { IModelVendor } from '../IModelVendor';
 import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
 
-import { ModelVendorOpenAI } from '../openai/openai.vendor';
+import { LLMOptionsOpenAI, ModelVendorOpenAI } from '../openai/openai.vendor';
+import { OpenAILLMOptions } from '../openai/OpenAILLMOptions';
 
-import { LocalAIServiceSetup } from './LocalAIServiceSetup';
+import { LocalAISourceSetup } from './LocalAISourceSetup';
 
 
-interface DLocalAIServiceSettings {
+export interface SourceSetupLocalAI {
   localAIHost: string;  // use OpenAI-compatible non-default hosts (full origin path)
   localAIKey: string;   // use OpenAI-compatible API keys
 }
 
-export const ModelVendorLocalAI: IModelVendor<DLocalAIServiceSettings, OpenAIAccessSchema> = {
+export const ModelVendorLocalAI: IModelVendor<SourceSetupLocalAI, OpenAIAccessSchema, LLMOptionsOpenAI> = {
   id: 'localai',
   name: 'LocalAI',
-  displayRank: 50,
+  rank: 20,
   location: 'local',
   instanceLimit: 4,
   hasBackendCapKey: 'hasLlmLocalAIHost',
@@ -27,7 +28,8 @@ export const ModelVendorLocalAI: IModelVendor<DLocalAIServiceSettings, OpenAIAcc
 
   // components
   Icon: LocalAIIcon,
-  ServiceSetupComponent: LocalAIServiceSetup,
+  SourceSetupComponent: LocalAISourceSetup,
+  LLMOptionsComponent: OpenAILLMOptions,
 
   // functions
   initializeSetup: () => ({
@@ -45,5 +47,6 @@ export const ModelVendorLocalAI: IModelVendor<DLocalAIServiceSettings, OpenAIAcc
 
   // OpenAI transport ('localai' dialect in 'access')
   rpcUpdateModelsOrThrow: ModelVendorOpenAI.rpcUpdateModelsOrThrow,
-
+  rpcChatGenerateOrThrow: ModelVendorOpenAI.rpcChatGenerateOrThrow,
+  streamingChatGenerateOrThrow: ModelVendorOpenAI.streamingChatGenerateOrThrow,
 };

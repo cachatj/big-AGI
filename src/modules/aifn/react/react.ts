@@ -2,12 +2,12 @@
  * porting of implementation from here: https://til.simonwillison.net/llms/python-react-pattern
  */
 
-import { aixChatGenerateText_Simple } from '~/modules/aix/client/aix.client';
+import type { DLLMId } from '~/modules/llms/store-llms';
 import { bareBonesPromptMixer } from '~/modules/persona/pmix/pmix';
 import { callApiSearchGoogle } from '~/modules/google/search.client';
-import { callBrowseFetchPageOrThrow } from '~/modules/browse/browse.client';
+import { callBrowseFetchPage } from '~/modules/browse/browse.client';
+import { llmChatGenerateOrThrow, VChatMessageIn } from '~/modules/llms/llm.client';
 
-import type { DLLMId } from '~/common/stores/llms/llms.types';
 import { frontendSideFetch } from '~/common/util/clientFetchers';
 
 
@@ -36,11 +36,11 @@ ALWAYS look up on google when the question is related to live events or factual 
 e.g. loadUrl: https://arxiv.org/abs/1706.03762
 Opens the given URL and displays it
 
-` : '') + /*`calculate:
+` : '') + `calculate:
 e.g. calculate: 4 * 7 / 3
-Runs a simple javascript calculation and returns the number, the input must be javascript 
+Runs a calculation and returns the number - uses Python so be sure to use floating point syntax if necessary
 
-` + */ `wikipedia:
+wikipedia:
 e.g. wikipedia: Django
 Returns a summary from searching Wikipedia
 
@@ -72,19 +72,13 @@ const actionRe = /^Action: (\w+): (.*)$/;
  *   - loop() is a function that will update the state (in place)
  */
 interface State {
-  instruction: string;
-  llm: string;
-  messages: { role: 'user' | 'model', text: string }[];
+  messages: VChatMessageIn[];
   nextPrompt: string;
   lastObservation: string;
   result: string | undefined;
 }
 
 export class Agent {
-
-  constructor(readonly contextRef: string, readonly abortSignal: AbortSignal) {
-    // this is here only to memo `contextRef` for later use
-  }
 
   // NOTE: this is here for demo, but the whole loop could be moved to the caller's event loop
   async reAct(question: string, llmId: DLLMId, maxTurns = 5, enableBrowse = false,
@@ -110,17 +104,16 @@ export class Agent {
   }
 
   initialize(question: string, assistantLLMId: DLLMId, enableBrowse: boolean, log: (...data: any[]) => void = console.log): State {
-    const systemPrompt = bareBonesPromptMixer(reActPrompt(enableBrowse), assistantLLMId);
-    log('## Prepare Buffer');
-    log('→ instruction [' + 1 + ']: "' + systemPrompt.slice(0, 86).replaceAll('\n', ' ') + ' ..."');
-    return {
-      instruction: systemPrompt,
-      messages: [],
+    const state: State = {
+      messages: [{ role: 'system', content: bareBonesPromptMixer(reActPrompt(enableBrowse), assistantLLMId) }],
       nextPrompt: question,
       lastObservation: '',
       result: undefined,
-      llm: assistantLLMId,
     };
+    log('## Prepare Buffer');
+    for (let i = 0; i < state.messages.length; i++)
+      log('→ ' + state.messages[i].role + ' [' + (i + 1) + ']: "' + state.messages[i].content.slice(0, 86).replaceAll('\n', ' ') + ' ..."');
+    return state;
   }
 
   truncateStringAfterPause(input: string): string {
@@ -135,18 +128,23 @@ export class Agent {
     return input.slice(0, endIndex);
   }
 
-  async llmChat(S: State, prompt: string, llmId: DLLMId): Promise<string> {
-    S.messages.push({ role: 'user', text: prompt });
-    let response = await aixChatGenerateText_Simple(llmId, S.instruction, S.messages, 'chat-react-turn', this.contextRef, { abortSignal: this.abortSignal });
+  async chat(S: State, prompt: string, llmId: DLLMId): Promise<string> {
+    S.messages.push({ role: 'user', content: prompt });
+    let content: string;
+    try {
+      content = (await llmChatGenerateOrThrow(llmId, S.messages, 'chat-react-turn', null, null, null, 500)).content;
+    } catch (error: any) {
+      content = `Error in llmChatGenerateOrThrow: ${error}`;
+    }
     // process response, strip out potential hallucinated response after PAUSE is detected
-    response = this.truncateStringAfterPause(response);
-    S.messages.push({ role: 'model', text: response });
-    return response;
+    content = this.truncateStringAfterPause(content);
+    S.messages.push({ role: 'assistant', content });
+    return content;
   }
 
   async step(S: State, llmId: DLLMId, log: (...data: any[]) => void = console.log) {
     log('→ ' + (S.lastObservation ? 'action' : 'user') + ' [' + (S.messages.length + 1) + ']: "' + S.nextPrompt + '"');
-    const result = await this.llmChat(S, S.nextPrompt, llmId);
+    const result = await this.chat(S, S.nextPrompt, llmId);
     log('← reAct [' + (S.messages.length) + ']: "' + result + '"');
     const actions = result
       .split('\n')
@@ -185,7 +183,7 @@ async function wikipedia(q: string): Promise<string> {
 
 async function search(query: string): Promise<string> {
   try {
-    const data = await callApiSearchGoogle(query, 10);
+    const data = await callApiSearchGoogle(query);
     return JSON.stringify(data);
   } catch (error: any) {
     console.error('Error fetching search results:', error);
@@ -195,9 +193,7 @@ async function search(query: string): Promise<string> {
 
 async function browse(url: string): Promise<string> {
   try {
-    const page = await callBrowseFetchPageOrThrow(url);
-    if (!page.content)
-      return page.file ? 'A file download was requested, but we only support web pages: ' + page.url : 'No content received';
+    const page = await callBrowseFetchPage(url);
     const pageContent = page.content.markdown || page.content.text || page.content.html || '';
     return JSON.stringify(pageContent ? { text: pageContent } : { error: 'Issue reading the page' });
   } catch (error) {
@@ -206,14 +202,11 @@ async function browse(url: string): Promise<string> {
   }
 }
 
-// Disable, as it allows for arbitrary code execution
-// async function calculate(what: string): Promise<string> {
-//   return String(eval(what));
-// }
+const calculate = async (what: string): Promise<string> => String(eval(what));
 
 const knownActions: { [key: string]: ActionFunction } = {
   wikipedia: wikipedia,
   google: search,
   loadUrl: browse,
-  // calculate: calculate, // DISABLED: security
+  calculate: calculate,
 };

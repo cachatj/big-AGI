@@ -3,14 +3,14 @@ import * as React from 'react';
 import { Alert, Box, Button, Typography } from '@mui/joy';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
-import { setComposerStartupText } from '~/common/logic/store-logic-sherpa';
+import { setComposerStartupText } from '../../src/apps/chat/components/composer/store-composer';
 
-import { callBrowseFetchPageOrThrow } from '~/modules/browse/browse.client';
+import { callBrowseFetchPage } from '~/modules/browse/browse.client';
 
 import { LogoProgress } from '~/common/components/LogoProgress';
 import { asValidURL } from '~/common/util/urlUtils';
 import { navigateToIndex, useRouterQuery } from '~/common/app.routes';
-import { withNextJSPerPageLayout } from '~/common/layout/withLayout';
+import { withLayout } from '~/common/layout/withLayout';
 
 
 /**
@@ -75,13 +75,9 @@ function AppShareTarget() {
   React.useEffect(() => {
     if (intentURL) {
       setIsDownloading(true);
-      callBrowseFetchPageOrThrow(intentURL)
+      callBrowseFetchPage(intentURL)
         .then(page => {
           if (page.stopReason !== 'error') {
-            if (!page.content) {
-              setErrorMessage(page.file ? 'No web page found, and we do not support files at the moment.' : 'No content found');
-              return;
-            }
             let pageContent = page.content.markdown || page.content.text || page.content.html || '';
             if (pageContent)
               pageContent = '\n\n```' + intentURL + '\n' + pageContent + '\n```\n';
@@ -139,4 +135,6 @@ function AppShareTarget() {
  * This page will be invoked on mobile when sharing Text/URLs/Files from other APPs
  * Example URL: https://localhost:3000/link/share_target?title=This+Title&text=https%3A%2F%2Fexample.com%2Fapp%2Fpath
  */
-export default withNextJSPerPageLayout({ type: 'container' }, () => <AppShareTarget />);
+export default function ShareTargetPage() {
+  return withLayout({ type: 'plain' }, <AppShareTarget />);
+}

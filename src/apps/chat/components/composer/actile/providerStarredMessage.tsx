@@ -1,8 +1,6 @@
-import { conversationTitle, DConversationId } from '~/common/stores/chat/chat.conversation';
-import { MESSAGE_FLAG_STARRED, messageFragmentsReduceText, messageHasUserFlag } from '~/common/stores/chat/chat.message';
-import { useChatStore } from '~/common/stores/chat/store-chats';
+import { conversationTitle, DConversationId, messageHasUserFlag, useChatStore } from '~/common/state/store-chats';
 
-import type { ActileItem, ActileProvider, ActileProviderItems } from './ActileProvider';
+import { ActileItem, ActileProvider } from './ActileProvider';
 
 
 export interface StarredMessageItem extends ActileItem {
@@ -10,44 +8,39 @@ export interface StarredMessageItem extends ActileItem {
   messageId: string,
 }
 
-export const providerStarredMessages = (onMessageSelect: (item: StarredMessageItem) => void): ActileProvider<StarredMessageItem> => ({
+export function providerStarredMessage(onMessageSeelect: (item: StarredMessageItem) => void): ActileProvider<StarredMessageItem> {
+  return {
 
-  key: 'pstrmsg',
+    // only the literal '@' at start of chat, or ' @' at end of chat
+    fastCheckTriggerText: (trailingText: string) => trailingText === '@' || trailingText.endsWith(' @'),
 
-  get label() {
-    return 'Starred Messages';
-  },
+    // finds all the starred messages in all the conversations - this could be heavy
+    fetchItems: async () => {
+      const { conversations } = useChatStore.getState();
 
-  // only the literal '@' at start of chat, or ' @' at end of chat
-  fastCheckTriggerText: (trailingText: string) => trailingText === '@' || trailingText.endsWith(' @'),
-
-  // finds all the starred messages in all the conversations - this could be heavy
-  fetchItems: async (): ActileProviderItems<StarredMessageItem> => {
-    const { conversations } = useChatStore.getState();
-
-    const starredMessages: StarredMessageItem[] = [];
-    conversations.forEach((conversation) => {
-      conversation.messages.forEach((message) => {
-        messageHasUserFlag(message, MESSAGE_FLAG_STARRED) && starredMessages.push({
-          key: message.id,
-          providerKey: 'pstrmsg',
-          // data
-          conversationId: conversation.id,
-          messageId: message.id,
-          // looks
-          label: conversationTitle(conversation) + ' - ' + messageFragmentsReduceText(message.fragments).slice(0, 32) + '...',
-          // description: message.text.slice(32, 100),
-          Icon: undefined,
-        } satisfies StarredMessageItem);
+      const starredMessages: StarredMessageItem[] = [];
+      conversations.forEach((conversation) => {
+        conversation.messages.forEach((message) => {
+          messageHasUserFlag(message, 'starred') && starredMessages.push({
+            // data
+            conversationId: conversation.id,
+            messageId: message.id,
+            // looks
+            key: message.id,
+            label: conversationTitle(conversation) + ' - ' + message.text.slice(0, 32) + '...',
+            // description: message.text.slice(32, 100),
+            Icon: undefined,
+          } satisfies StarredMessageItem);
+        });
       });
-    });
 
-    return {
-      searchPrefix: '',
-      items: starredMessages,
-    };
-  },
+      return {
+        title: 'Starred Messages',
+        searchPrefix: '',
+        items: starredMessages,
+      };
+    },
 
-  onItemSelect: item => onMessageSelect(item as StarredMessageItem),
-
-});
+    onItemSelect: item => onMessageSeelect(item as StarredMessageItem),
+  };
+}

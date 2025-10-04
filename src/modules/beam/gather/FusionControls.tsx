@@ -7,9 +7,6 @@ import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
 import StopRoundedIcon from '@mui/icons-material/StopRounded';
 
 import { GoodTooltip } from '~/common/components/GoodTooltip';
-import { TooltipOutlined } from '~/common/components/TooltipOutlined';
-
-import { rayControlsMobileSx, rayControlsSx } from '../scatter/BeamRay';
 
 import type { BFusion } from './beam.gather';
 import type { FusionFactorySpec } from './instructions/beam.gather.factories';
@@ -22,24 +19,22 @@ function FusionControls(props: {
   factory: FusionFactorySpec,
   isFusing: boolean,
   isInterrupted: boolean,
-  isMobile: boolean,
   isUsable: boolean,
   llmLabel: string,
   llmVendorIcon?: React.FunctionComponent<SvgIconProps>,
-  fusionAvatarTooltip: React.ReactNode,
   onRemove: () => void,
   onToggleGenerate: () => void,
 }) {
   return (
-    <Box sx={props.isMobile ? rayControlsMobileSx : rayControlsSx}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
 
-      {/* LLM Icon with Tooltip */}
+      {/* LLM Icon */}
       {!!props.llmVendorIcon && (
-        <TooltipOutlined asLargePane enableInteractive title={props.fusionAvatarTooltip || props.llmLabel} placement='top-start'>
+        <GoodTooltip placement='top' arrow title={props.llmLabel}>
           <Box sx={{ display: 'flex' }}>
             <props.llmVendorIcon sx={{ fontSize: 'lg', my: 'auto' }} />
           </Box>
-        </TooltipOutlined>
+        </GoodTooltip>
       )}
 
       {/* Title / Progress Component */}
@@ -77,7 +72,6 @@ function FusionControls(props: {
           )}
       </Sheet>
 
-      {/* Generate / Stop Button */}
       {!props.isFusing ? (
         <GoodTooltip title={!props.isUsable ? 'Start Merge' : 'Retry'}>
           <IconButton size='sm' variant='plain' color='success' onClick={props.onToggleGenerate}>
@@ -92,7 +86,6 @@ function FusionControls(props: {
         </GoodTooltip>
       )}
 
-      {/* Remove Button */}
       <GoodTooltip title='Remove'>
         <IconButton size='sm' variant='plain' color='neutral' onClick={props.onRemove}>
           <RemoveCircleOutlineRoundedIcon />

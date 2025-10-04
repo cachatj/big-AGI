@@ -7,9 +7,9 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import Diversity2Icon from '@mui/icons-material/Diversity2';
 import DoneIcon from '@mui/icons-material/Done';
 
-import { OptimaDrawerHeader } from '~/common/layout/optima/drawer/OptimaDrawerHeader';
-import { OptimaDrawerList } from '~/common/layout/optima/drawer/OptimaDrawerList';
-import { optimaCloseDrawer } from '~/common/layout/optima/useOptima';
+import { PageDrawerHeader } from '~/common/layout/optima/components/PageDrawerHeader';
+import { PageDrawerList } from '~/common/layout/optima/components/PageDrawerList';
+import { useOptimaDrawers } from '~/common/layout/optima/useOptimaDrawers';
 
 import { CreatorDrawerItem } from './CreatorDrawerItem';
 import { deleteSimplePersona, deleteSimplePersonas, useSimplePersonas } from '../store-app-personas';
@@ -25,6 +25,7 @@ export function CreatorDrawer(props: {
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
 
   // external state
+  const { closeDrawer } = useOptimaDrawers();
   const { simplePersonas } = useSimplePersonas();
 
 
@@ -86,9 +87,9 @@ export function CreatorDrawer(props: {
   return <>
 
     {/* Drawer Header */}
-    <OptimaDrawerHeader
+    <PageDrawerHeader
       title={selectMode ? 'Selection Mode' : 'Recent'}
-      onClose={selectMode ? handleSelectionClose : optimaCloseDrawer}
+      onClose={selectMode ? handleSelectionClose : closeDrawer}
     >
       {hasPersonas && !selectMode && (
         <Tooltip title={selectMode ? 'Done' : 'Select'}>
@@ -97,9 +98,9 @@ export function CreatorDrawer(props: {
           </IconButton>
         </Tooltip>
       )}
-    </OptimaDrawerHeader>
+    </PageDrawerHeader>
 
-    <OptimaDrawerList
+    <PageDrawerList
       variant='plain'
       noTopPadding noBottomPadding tallRows
       onClick={handleSimplePersonaUnselect}
@@ -180,7 +181,7 @@ export function CreatorDrawer(props: {
         )}
       </Box>
 
-    </OptimaDrawerList>
+    </PageDrawerList>
 
   </>;
 }

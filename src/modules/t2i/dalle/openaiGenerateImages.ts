@@ -1,20 +1,17 @@
 import { apiAsync } from '~/common/util/trpc.client';
 
+import type { DModelSourceId } from '../../llms/store-llms';
 import type { OpenAIAccessSchema } from '../../llms/server/openai/openai.router';
+import { findAccessForSourceOrThrow } from '../../llms/vendors/vendors.registry';
 
-import type { DModelsServiceId } from '~/common/stores/llms/modelsservice.types';
-import { findServiceAccessOrThrow } from '~/modules/llms/vendors/vendor.helpers';
-
-import type { T2iCreateImageOutput } from '../t2i.server';
 import { useDalleStore } from './store-module-dalle';
-
 
 /**
  * Client function to call the OpenAI image generation API.
  */
-export async function openAIGenerateImagesOrThrow(modelServiceId: DModelsServiceId, prompt: string, count: number): Promise<T2iCreateImageOutput[]> {
+export async function openAIGenerateImagesOrThrow(modelSourceId: DModelSourceId, prompt: string, _count: number): Promise<string[]> {
 
-  // Use the current settings
+  // use the current settings
   const {
     dalleModelId,
     dalleQuality,
@@ -27,39 +24,39 @@ export async function openAIGenerateImagesOrThrow(modelServiceId: DModelsService
   if (dalleNoRewrite)
     prompt = 'I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS: ' + prompt;
 
+  const isD3 = dalleModelId === 'dall-e-3';
 
-  // Function to generate images in batches
-  const generateImagesBatch = async (imageCount: number): Promise<T2iCreateImageOutput[]> =>
-    apiAsync.llmOpenAI.createImages.mutate({
-      access: findServiceAccessOrThrow<{}, OpenAIAccessSchema>(modelServiceId).transportAccess,
+  // parallelize the image generation depending on how many images can a model generate
+  const imagePromises: Promise<string[]>[] = [];
+  while (_count > 0) {
+
+    // per-request count
+    const perRequestCount = Math.min(_count, isD3 ? 1 : 10);
+
+    const imageRefPromise = apiAsync.llmOpenAI.createImages.mutate({
+      access: findAccessForSourceOrThrow<unknown, OpenAIAccessSchema>(modelSourceId).transportAccess,
       config: {
-        prompt,
-        count: imageCount,
+        prompt: prompt,
+        count: perRequestCount,
         model: dalleModelId,
         quality: dalleQuality,
+        responseFormat: 'url',
         size: dalleSize,
         style: dalleStyle,
-        responseFormat: 'b64_json',
       },
-    });
+    }).then(images =>
+      // convert to markdown image references
+      images.map(({ imageUrl, altText }) => `![${altText}](${imageUrl})`),
+    );
 
+    imagePromises.push(imageRefPromise);
+    _count -= perRequestCount;
+  }
 
-  // Calculate the number of batches required
-  const isD3 = dalleModelId === 'dall-e-3';
-  const maxBatchSize = isD3 ? 1 : 10;
-  const totalBatches = Math.ceil(count / maxBatchSize);
-
-  // Create an array of promises for image generation
-  const imagePromises = Array.from({ length: totalBatches }, (_, index) => {
-    const batchCount = Math.min(count - index * maxBatchSize, maxBatchSize);
-    return generateImagesBatch(batchCount);
-  });
-
-  // Run all image generation requests in parallel and handle all results
+  // run all image generation requests
   const imageRefsBatchesResults = await Promise.allSettled(imagePromises);
 
-
-  // Throw if ALL promises were rejected
+  // throw if ALL promises were rejected
   const allRejected = imageRefsBatchesResults.every(result => result.status === 'rejected');
   if (allRejected) {
     const errorMessages = imageRefsBatchesResults
@@ -73,10 +70,10 @@ export async function openAIGenerateImagesOrThrow(modelServiceId: DModelsService
     throw new Error(`OpenAI image generation: ${errorMessages}`);
   }
 
-  // Take successful results and return as a flat array
+  // take successful results and return as string[]
   return imageRefsBatchesResults
     .filter(result => result.status === 'fulfilled') // Only take fulfilled promises
-    .map(result => (result as PromiseFulfilledResult<T2iCreateImageOutput[]>).value) // Get the value
+    .map(result => (result as PromiseFulfilledResult<string[]>).value) // Extract the value
     .flat();
 }
 

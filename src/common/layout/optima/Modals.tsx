@@ -3,36 +3,27 @@ import * as React from 'react';
 import { ModelsModal } from '~/modules/llms/models-modal/ModelsModal';
 import { SettingsModal } from '../../../apps/settings-modal/SettingsModal';
 import { ShortcutsModal } from '../../../apps/settings-modal/ShortcutsModal';
-
-import { optimaActions, optimaOpenPreferences, useOptimaModalsState } from './useOptima';
+import { useOptimaLayout } from './useOptimaLayout';
 
 
 export function Modals(props: { suspendAutoModelsSetup?: boolean }) {
 
   // external state
-  const { showKeyboardShortcuts, showPreferences, preferencesTab } = useOptimaModalsState();
-
-  // derived state
-  const { closeKeyboardShortcuts, closePreferences, openKeyboardShortcuts } = optimaActions();
+  const {
+    showPreferencesTab, closePreferences,
+    showShortcuts, openShortcuts, closeShortcuts,
+  } = useOptimaLayout();
 
   return <>
 
-    {/* Overlay - Preferences Modal */}
-    <SettingsModal
-      open={showPreferences}
-      tab={preferencesTab}
-      setTab={optimaOpenPreferences}
-      onClose={closePreferences}
-      onOpenShortcuts={openKeyboardShortcuts}
-    />
+    {/* Overlay Settings */}
+    <SettingsModal open={!!showPreferencesTab} tabIndex={showPreferencesTab} onClose={closePreferences} onOpenShortcuts={openShortcuts} />
 
     {/* Overlay Models + LLM Options */}
     <ModelsModal suspendAutoModelsSetup={props.suspendAutoModelsSetup} />
 
     {/* Overlay Shortcuts */}
-    {showKeyboardShortcuts && (
-      <ShortcutsModal onClose={closeKeyboardShortcuts} />
-    )}
+    {showShortcuts && <ShortcutsModal onClose={closeShortcuts} />}
 
   </>;
 }

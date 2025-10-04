@@ -1,9 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { v4 as uuidv4 } from 'uuid';
 
-import type { DLLMId } from '~/common/stores/llms/llms.types';
-import { agiUuid } from '~/common/util/idUtils';
-
+import type { DLLMId } from '~/modules/llms/store-llms';
 import type { FFactoryId } from './gather/instructions/beam.gather.factories';
 
 
@@ -21,7 +20,6 @@ export interface BeamConfigSnapshot {
 interface ModuleBeamState {
   presets: BeamConfigSnapshot[];
   lastConfig: BeamConfigSnapshot | null;
-  cardAdd: boolean;
   cardScrolling: boolean;
   scatterShowLettering: boolean;
   scatterShowPrevMessages: boolean;
@@ -37,7 +35,6 @@ interface ModuleBeamStore extends ModuleBeamState {
   updateLastConfig: (update: Partial<BeamConfigSnapshot>) => void;
   deleteLastConfig: () => void;
 
-  toggleCardAdd: () => void;
   toggleCardScrolling: () => void;
   toggleScatterShowLettering: () => void;
   toggleScatterShowPrevMessages: () => void;
@@ -51,7 +48,6 @@ export const useModuleBeamStore = create<ModuleBeamStore>()(persist(
 
     presets: [],
     lastConfig: null,
-    cardAdd: true,
     cardScrolling: false,
     scatterShowLettering: false,
     scatterShowPrevMessages: false,
@@ -61,7 +57,7 @@ export const useModuleBeamStore = create<ModuleBeamStore>()(persist(
 
     addPreset: (name, rayLlmIds, gatherLlmId, gatherFactoryId) => _set(state => ({
       presets: [...state.presets, {
-        id: agiUuid('beam-preset-config'),
+        id: uuidv4(),
         name,
         rayLlmIds,
         gatherLlmId: gatherLlmId ?? undefined,
@@ -86,8 +82,6 @@ export const useModuleBeamStore = create<ModuleBeamStore>()(persist(
 
     deleteLastConfig: () => _set({ lastConfig: null }),
 
-
-    toggleCardAdd: () => _set(state => ({ cardAdd: !state.cardAdd })),
 
     toggleCardScrolling: () => _set(state => ({ cardScrolling: !state.cardScrolling })),
 

@@ -1,6 +1,5 @@
 import * as React from 'react';
-
-import type { ActileItem, ActileProvider } from './ActileProvider';
+import { ActileItem, ActileProvider } from './ActileProvider';
 import { ActilePopup } from './ActilePopup';
 
 
@@ -8,74 +7,71 @@ export const useActileManager = (providers: ActileProvider[], anchorRef: React.R
 
   // state
   const [popupOpen, setPopupOpen] = React.useState(false);
-  const [itemsByProvider, setItemsByProvider] = React.useState<{ provider: ActileProvider, items: ActileItem[] }[]>([]);
+  const [provider, setProvider] = React.useState<ActileProvider | null>(null);
+
+  const [title, setTitle] = React.useState<string>('');
+  const [items, setItems] = React.useState<ActileItem[]>([]);
   const [activeSearchString, setActiveSearchString] = React.useState<string>('');
   const [activeItemIndex, setActiveItemIndex] = React.useState<number>(0);
 
-  // derived state
-  const activeItemsByProvider = React.useMemo(() => {
-    const search = activeSearchString.trim().toLowerCase();
-    return itemsByProvider.map(({ provider, items }) => ({
-      provider,
-      items: items.filter(item => item.label?.toLowerCase().startsWith(search)),
-    })).filter(({ items }) => items.length > 0);
-  }, [itemsByProvider, activeSearchString]);
 
-  const flatActiveItems = React.useMemo(() => {
-    return activeItemsByProvider.flatMap(({ items }) => items);
-  }, [activeItemsByProvider]);
-  const totalItems = flatActiveItems.length;
-  const activeItem = totalItems > 0 && activeItemIndex >= 0 && activeItemIndex < totalItems ? flatActiveItems[activeItemIndex] : null;
+  // derived state
+  const activeItems = React.useMemo(() => {
+    const search = activeSearchString.trim().toLowerCase();
+    return items.filter(item => item.label?.toLowerCase().startsWith(search));
+  }, [items, activeSearchString]);
+  const activeItem = activeItemIndex >= 0 && activeItemIndex < activeItems.length ? activeItems[activeItemIndex] : null;
+
 
   const handleClose = React.useCallback(() => {
     setPopupOpen(false);
-    setItemsByProvider([]);
+    setProvider(null);
+    setTitle('');
+    setItems([]);
     setActiveSearchString('');
     setActiveItemIndex(0);
   }, []);
 
   const handlePopupItemClicked = React.useCallback((item: ActileItem) => {
-    const provider = providers.find(p => p.key === item.providerKey);
     provider?.onItemSelect(item);
     handleClose();
-  }, [providers, handleClose]);
+  }, [handleClose, provider]);
 
   const handleEnterKey = React.useCallback(() => {
-    if (activeItem)
-      handlePopupItemClicked(activeItem);
+    activeItem && handlePopupItemClicked(activeItem);
   }, [activeItem, handlePopupItemClicked]);
 
-  const actileInterceptTextChange = React.useCallback((trailingText: string) => {
-    // Collect all providers whose trigger matches
-    const matchingProviders = providers.filter(provider => provider.fastCheckTriggerText(trailingText));
 
-    if (matchingProviders.length > 0) {
-      // Fetch items from all matching providers
-      Promise.all(matchingProviders.map(provider =>
-        provider.fetchItems().then(({ searchPrefix, items }) => ({
-          provider,
-          searchPrefix,
-          items: items.map(item => ({ ...item, providerKey: provider.key })),
-        })),
-      )).then((results) => {
-        // Filter out empty results
-        results = results.filter(result => result.items.length > 0);
-        if (results.length) {
-          setPopupOpen(true);
-          setItemsByProvider(results.map(result => ({ provider: result.provider, items: result.items })));
-          setActiveSearchString(results[0].searchPrefix); // Assuming all search prefixes are the same
-          setActiveItemIndex(0);
-        }
-      }).catch(error => {
-        handleClose();
-        console.error('Failed to fetch popup items:', error);
-      });
-      return true;
+  const actileInterceptTextChange = React.useCallback((trailingText: string) => {
+    for (const provider of providers) {
+      if (provider.fastCheckTriggerText(trailingText)) {
+        provider
+          .fetchItems()
+          .then(({ title, searchPrefix, items }) => {
+            // if there are no items, ignore
+            if (items.length) {
+              setPopupOpen(true);
+              setProvider(provider);
+              setTitle(title);
+              setItems(items);
+              setActiveSearchString(searchPrefix);
+            }
+          })
+          .catch(error => {
+            handleClose();
+            console.error('Failed to fetch popup items:', error);
+          });
+        return true;
+      }
     }
     return false;
   }, [handleClose, providers]);
 
+
   const actileInterceptKeydown = React.useCallback((_event: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
+
+    // Popup open: Intercept
+
     const { key, currentTarget, ctrlKey, metaKey } = _event;
 
     if (popupOpen) {
@@ -84,11 +80,11 @@ export const useActileManager = (providers: ActileProvider[], anchorRef: React.R
         handleClose();
       } else if (key === 'ArrowUp') {
         _event.preventDefault();
-        setActiveItemIndex((prevIndex) => (prevIndex > 0 ? prevIndex - 1 : totalItems - 1));
+        setActiveItemIndex((prevIndex) => (prevIndex > 0 ? prevIndex - 1 : activeItems.length - 1));
       } else if (key === 'ArrowDown') {
         _event.preventDefault();
-        setActiveItemIndex((prevIndex) => (prevIndex < totalItems - 1 ? prevIndex + 1 : 0));
-      } else if (key === 'Enter' || key === 'ArrowRight' || key === 'Tab' || (key === ' ' && totalItems === 1)) {
+        setActiveItemIndex((prevIndex) => (prevIndex < activeItems.length - 1 ? prevIndex + 1 : 0));
+      } else if (key === 'Enter' || key === 'ArrowRight' || key === 'Tab' || (key === ' ' && activeItems.length === 1)) {
         _event.preventDefault();
         handleEnterKey();
       } else if (key === 'Backspace') {
@@ -104,20 +100,22 @@ export const useActileManager = (providers: ActileProvider[], anchorRef: React.R
     const trailingText = (currentTarget.value || '') + key;
     return actileInterceptTextChange(trailingText);
 
-  }, [actileInterceptTextChange, handleClose, handleEnterKey, popupOpen, totalItems]);
+  }, [actileInterceptTextChange, activeItems.length, handleClose, handleEnterKey, popupOpen]);
+
 
   const actileComponent = React.useMemo(() => {
     return !popupOpen ? null : (
       <ActilePopup
         anchorEl={anchorRef.current}
         onClose={handleClose}
-        itemsByProvider={activeItemsByProvider}
+        title={title}
+        items={activeItems}
         activeItemIndex={activeItemIndex}
         activePrefixLength={activeSearchString.length}
         onItemClick={handlePopupItemClicked}
       />
     );
-  }, [activeItemIndex, activeItemsByProvider, activeSearchString.length, anchorRef, handleClose, handlePopupItemClicked, popupOpen]);
+  }, [activeItemIndex, activeItems, activeSearchString.length, anchorRef, handleClose, handlePopupItemClicked, popupOpen, title]);
 
   return {
     actileComponent,

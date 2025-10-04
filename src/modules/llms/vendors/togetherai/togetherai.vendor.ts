@@ -3,28 +3,30 @@ import { TogetherIcon } from '~/common/components/icons/vendors/TogetherIcon';
 import type { IModelVendor } from '../IModelVendor';
 import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
 
-import { ModelVendorOpenAI } from '../openai/openai.vendor';
+import { LLMOptionsOpenAI, ModelVendorOpenAI } from '../openai/openai.vendor';
+import { OpenAILLMOptions } from '../openai/OpenAILLMOptions';
 
-import { TogetherAIServiceSetup } from './TogetherAIServiceSetup';
+import { TogetherAISourceSetup } from './TogetherAISourceSetup';
 
 
-interface DTogetherAIServiceSettings {
+export interface SourceSetupTogetherAI {
   togetherKey: string;
   togetherHost: string;
   togetherFreeTrial: boolean;
 }
 
-export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, OpenAIAccessSchema> = {
+export const ModelVendorTogetherAI: IModelVendor<SourceSetupTogetherAI, OpenAIAccessSchema, LLMOptionsOpenAI> = {
   id: 'togetherai',
   name: 'Together AI',
-  displayRank: 34,
+  rank: 17,
   location: 'cloud',
   instanceLimit: 1,
   hasBackendCapKey: 'hasLlmTogetherAI',
 
   // components
   Icon: TogetherIcon,
-  ServiceSetupComponent: TogetherAIServiceSetup,
+  SourceSetupComponent: TogetherAISourceSetup,
+  LLMOptionsComponent: OpenAILLMOptions,
 
   // functions
   initializeSetup: () => ({
@@ -44,8 +46,8 @@ export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, Ope
     moderationCheck: false,
   }),
 
-  // there is delay for Together Free API calls
-  rateLimitChatGenerate: async (_llm, partialSetup) => {
+  // there is delay for OpenRouter Free API calls
+  getRateLimitDelay: (_llm, partialSetup) => {
     const now = Date.now();
     const elapsed = now - nextGenerationTs;
     const wait = partialSetup?.togetherFreeTrial
@@ -55,16 +57,18 @@ export const ModelVendorTogetherAI: IModelVendor<DTogetherAIServiceSettings, Ope
     if (elapsed < wait) {
       const delay = wait - elapsed;
       nextGenerationTs = now + delay;
-      await new Promise(resolve => setTimeout(resolve, delay));
+      return delay;
     } else {
       nextGenerationTs = now;
+      return 0;
     }
   },
 
 
   // OpenAI transport ('togetherai' dialect in 'access')
   rpcUpdateModelsOrThrow: ModelVendorOpenAI.rpcUpdateModelsOrThrow,
-
+  rpcChatGenerateOrThrow: ModelVendorOpenAI.rpcChatGenerateOrThrow,
+  streamingChatGenerateOrThrow: ModelVendorOpenAI.streamingChatGenerateOrThrow,
 };
 
 // rate limit timestamp

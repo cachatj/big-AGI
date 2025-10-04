@@ -1,25 +1,23 @@
 import * as React from 'react';
+import { shallow } from 'zustand/shallow';
 
 import type { SxProps } from '@mui/joy/styles/types';
 import { FormControl, ListDivider, ListItemDecorator, Option, Select, SvgIconProps } from '@mui/joy';
 
-import type { IModelVendor } from '~/modules/llms/vendors/IModelVendor';
-import { findModelVendor } from '~/modules/llms/vendors/vendors.registry';
+import { DLLM, DLLMId, useModelsStore } from '~/modules/llms/store-llms';
+import { findVendorById } from '~/modules/llms/vendors/vendors.registry';
 
-import type { DLLM, DLLMId } from '~/common/stores/llms/llms.types';
-import { getChatLLMId } from '~/common/stores/llms/store-llms';
-import { useNonHiddenLLMs } from '~/common/stores/llms/llms.hooks';
-
-import { FormLabelStart } from './FormLabelStart';
+import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
+import { IModelVendor } from '~/modules/llms/vendors/IModelVendor';
 
 
 /*export function useLLMSelectGlobalState(): [DLLMId | null, (llmId: DLLMId | null) => void] {
-  return ...(useShallow(state => [state.chatLLMId, state.setChatLLMId]));
+  return useModelsStore(state => [state.chatLLMId, state.setChatLLMId], shallow);
 }*/
 
 export function useLLMSelectLocalState(initFromGlobal: boolean): [DLLMId | null, (llmId: DLLMId | null) => void] {
   return React.useState<DLLMId | null>(initFromGlobal ? () => {
-    return getChatLLMId();
+    return useModelsStore.getState().chatLLMId;
   } : null);
 }
 
@@ -27,24 +25,7 @@ const llmSelectSx: SxProps = {
   flex: 1,
   backgroundColor: 'background.popup',
   // minWidth: '200',
-} as const;
-
-const _slotProps = {
-  listbox: {
-    sx: {
-      // larger list
-      '--ListItem-paddingLeft': '1rem',
-      '--ListItem-minHeight': '2.5rem',
-      // minWidth: '100%',
-    } as const,
-  } as const,
-  button: {
-    sx: {
-      // show the full name on the button
-      whiteSpace: 'inherit',
-    } as const,
-  } as const,
-} as const;
+};
 
 /**
  * Select the Model, synced with either Global (Chat) LLM state, or local
@@ -68,7 +49,9 @@ export function useLLMSelect(
 ): [DLLM | null, React.JSX.Element | null, React.FunctionComponent<SvgIconProps> | undefined] {
 
   // external state
-  const _filteredLLMs = useNonHiddenLLMs();
+  const _filteredLLMs = useModelsStore(state => {
+    return state.llms.filter(llm => !llm.hidden || (chatLLMId && llm.id === chatLLMId));
+  }, shallow);
 
   // derived state
   const noIcons = false; //smaller;
@@ -83,7 +66,7 @@ export function useLLMSelect(
     let formerVendor: IModelVendor | null = null;
     return _filteredLLMs.reduce((acc, llm, _index) => {
 
-      const vendor = findModelVendor(llm.vId);
+      const vendor = findVendorById(llm._source?.vId);
       const vendorChanged = vendor !== formerVendor;
       if (vendorChanged)
         formerVendor = vendor;
@@ -100,7 +83,6 @@ export function useLLMSelect(
           value={llm.id}
           // Disabled to avoid regenerating the memo too frequently
           // sx={llm.id === chatLLMId ? { fontWeight: 'md' } : undefined}
-          label={llm.label}
         >
           {(!noIcons && !!vendor?.Icon) && (
             <ListItemDecorator>
@@ -133,7 +115,22 @@ export function useLLMSelect(
         disabled={disabled}
         onChange={onSelectChange}
         placeholder={placeholder}
-        slotProps={_slotProps}
+        slotProps={{
+          listbox: {
+            sx: {
+              // larger list
+              '--ListItem-paddingLeft': '1rem',
+              '--ListItem-minHeight': '2.5rem',
+              // minWidth: '100%',
+            },
+          },
+          button: {
+            sx: {
+              // show the full name on the button
+              whiteSpace: 'inherit',
+            },
+          },
+        }}
         sx={llmSelectSx}
       >
         {componentOptions}
@@ -144,7 +141,7 @@ export function useLLMSelect(
 
   // Memo the vendor icon for the chat LLM
   const chatLLMVendorIconFC = React.useMemo(() => {
-    return findModelVendor(chatLLM?.vId)?.Icon;
+    return findVendorById(chatLLM?._source?.vId)?.Icon;
   }, [chatLLM]);
 
   return [chatLLM, llmSelectComponent, chatLLMVendorIconFC];

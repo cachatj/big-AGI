@@ -4,13 +4,13 @@ import TimeAgo from 'react-timeago';
 import { Box, ListDivider, ListItem, ListItemButton, ListItemDecorator, Switch, Typography } from '@mui/joy';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
-import type { SharedChatLinkItem } from '~/modules/trade/link/store-share-link';
+import type { SharedChatLinkItem } from '~/modules/trade/link/store-link';
 
 import { Link } from '~/common/components/Link';
-import { OptimaDrawerHeader } from '~/common/layout/optima/drawer/OptimaDrawerHeader';
-import { OptimaDrawerList } from '~/common/layout/optima/drawer/OptimaDrawerList';
+import { PageDrawerHeader } from '~/common/layout/optima/components/PageDrawerHeader';
+import { PageDrawerList } from '~/common/layout/optima/components/PageDrawerList';
 import { getChatLinkRelativePath } from '~/common/app.routes';
-import { optimaCloseDrawer } from '~/common/layout/optima/useOptima';
+import { useOptimaDrawers } from '~/common/layout/optima/useOptimaDrawers';
 
 
 /**
@@ -25,6 +25,10 @@ export function LinkChatDrawer(props: {
 
   // state
   const [showDeletionKeys, setShowDeletionKeys] = React.useState<boolean>(false);
+
+
+  // external state
+  const { closeDrawer } = useOptimaDrawers();
 
   // derived state
   const { activeLinkId, onDeleteLink } = props;
@@ -43,12 +47,12 @@ export function LinkChatDrawer(props: {
 
   return <>
 
-    <OptimaDrawerHeader
+    <PageDrawerHeader
       title='Your Shared Links'
-      onClose={optimaCloseDrawer}
+      onClose={closeDrawer}
     />
 
-    <OptimaDrawerList variant='plain' noTopPadding noBottomPadding tallRows>
+    <PageDrawerList variant='plain' noTopPadding noBottomPadding tallRows>
 
       <ListItem>
         <Typography level='body-sm'>
@@ -101,7 +105,7 @@ export function LinkChatDrawer(props: {
         <Switch checked={showDeletionKeys} sx={{ ml: 'auto' }} />
       </ListItemButton>
 
-    </OptimaDrawerList>
+    </PageDrawerList>
 
   </>;
 

@@ -14,7 +14,6 @@ import { PerplexityIcon } from '~/common/components/icons/vendors/PerplexityIcon
 
 import { Brand } from '~/common/app.config';
 import { Link } from '~/common/components/Link';
-import { Release } from '~/common/app.release';
 import { clientUtmSource } from '~/common/util/pwaUtils';
 import { platformAwareKeystrokes } from '~/common/components/KeyStroke';
 
@@ -52,18 +51,15 @@ interface NewsItem {
 
 // news and feature surfaces
 export const NewsItems: NewsItem[] = [
-  {
-    versionCode: Release.App.versionCode,
-    versionName: Release.App.versionName,
-    versionDate: new Date('2024-10-15T01:00:00Z'),
+  /*{
+    versionCode: '1.17.0',
     items: [
-      { text: <>You&apos;re running an <B>unsupported Early Access</B> build of Big-AGI V2. This version is used by developers to implement long-term breaking features.</> },
-      { text: <>This branch previews experimental features that are subject to change and may break without notice.</> },
-      { text: <>Please report screenshots of breakages and console error messages.</> },
-      { text: <>Please note that this is not the official release.</> },
-      { text: <>For stable releases: <ExternalLink href='https://big-agi.com'>big-agi.com</ExternalLink>.</> },
-    ],
-  },
+      Screen Capture (when removed from labs)
+      Auto-Merge
+      Draw
+      ...
+    ]
+  }*/
   {
     versionCode: '1.16.9',
     versionName: 'Crystal Clear',
@@ -90,7 +86,7 @@ export const NewsItems: NewsItem[] = [
       { text: <>1.16.7: Gpt-4o <B>2024-08-06</B></> },
       { text: <>1.16.8: <B>ChatGPT-4o</B> latest</> },
       { text: <>1.16.9: <B>Gemini</B> fixes</> },
-      { text: <>OpenAI <B>o1</B>, DeepSeek R1, and newer models require Big-AGI 2. <B href='https://y2rjg0zillz.typeform.com/to/ZSADpr5u?utm_source=gh-2&utm_medium=news&utm_campaign=ea2'>Sign up here</B></> },
+      { text: <>OpenAI <B>o1</B>, DeepSeek R1, and newer models require Big-AGI 2. <B href='https://form.typeform.com/to/ZSADpr5u?utm_source=gh-stable&utm_medium=news&utm_campaign=ea2'>Sign up here</B></> },
     ],
   },
   {
@@ -236,7 +232,7 @@ export const NewsItems: NewsItem[] = [
       { text: <>Enhanced security via <B code='/docs/deploy-authentication.md'>password protection</B></> },
       { text: <>{platformAwareKeystrokes('Ctrl+Shift+O')}: quick access to model options</> },
       { text: <>Optimized voice input and performance</> },
-      { text: <>Latest Ollama models</> },
+      { text: <>Latest Ollama and Oobabooga models</> },
     ],
   },
   {
@@ -297,6 +293,7 @@ export const NewsItems: NewsItem[] = [
       { text: <><B>Flattener</B> - 4-mode conversations summarizer</> },
       { text: <><B>Forking</B> - branch your conversations</> },
       { text: <><B>/s</B> and <B>/a</B> to append a <i>system</i> or <i>assistant</i> message</> },
+      { text: <>Local LLMs with <B code='/docs/config-local-oobabooga.md'>Oobabooga server</B></> },
       { text: 'NextJS STOP bug.. squashed, with Vercel!' },
     ],
   },
@@ -332,10 +329,8 @@ function B(props: {
   );
   if (!href)
     return boldText;
-  // append UTM details if missing
-  const hrefWithUtm = href.includes('utm_source=') ? href : href + clientUtmSource();
   return (
-    <ExternalLink href={hrefWithUtm} highlight={props.wow} icon={props.issue ? 'issue' : undefined}>
+    <ExternalLink href={href + clientUtmSource()} highlight={props.wow} icon={props.issue ? 'issue' : undefined}>
       {boldText}
     </ExternalLink>
   );

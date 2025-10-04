@@ -9,19 +9,17 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import StopOutlinedIcon from '@mui/icons-material/StopOutlined';
 import TelegramIcon from '@mui/icons-material/Telegram';
 
-import { AutoBlocksRenderer } from '~/modules/blocks/AutoBlocksRenderer';
-import { aixChatGenerateText_Simple } from '~/modules/aix/client/aix.client';
+import { BlocksRenderer } from '~/modules/blocks/BlocksRenderer';
+import { llmStreamingChatGenerate } from '~/modules/llms/llm.client';
 
-import { ConversationsManager } from '~/common/chat-overlay/ConversationsManager';
-import { GoodModal } from '~/common/components/modals/GoodModal';
+import { GoodModal } from '~/common/components/GoodModal';
 import { InlineError } from '~/common/components/InlineError';
 import { adjustContentScaling } from '~/common/app.theme';
-import { createDMessageTextContent, messageFragmentsReduceText } from '~/common/stores/chat/chat.message';
-import { splitSystemMessageFromHistory } from '~/common/stores/chat/chat.conversation';
+import { createDMessage, useChatStore } from '~/common/state/store-chats';
 import { useFormRadio } from '~/common/components/forms/useFormRadio';
 import { useFormRadioLlmType } from '~/common/components/forms/useFormRadioLlmType';
 import { useIsMobile } from '~/common/components/useMatchMedia';
-import { useUIContentScaling } from '~/common/state/store-ui';
+import { useUIPreferencesStore } from '~/common/state/store-ui';
 
 import { bigDiagramPrompt, DiagramLanguage, diagramLanguages, DiagramType, diagramTypes } from './diagrams.data';
 
@@ -30,10 +28,10 @@ import { bigDiagramPrompt, DiagramLanguage, diagramLanguages, DiagramType, diagr
 const DIAGRAM_ACTOR_PREFIX = 'diagram';
 
 
-// Used by the callers to setup the diagram session
+// Used by the callers to setup the diagam session
 export interface DiagramConfig {
   conversationId: string;
-  messageId: string;
+  messageId: string,
   text: string;
 }
 
@@ -66,15 +64,13 @@ export function DiagramsModal(props: { config: DiagramConfig, onClose: () => voi
 
   // external state
   const isMobile = useIsMobile();
-  const contentScaling = useUIContentScaling();
+  const contentScaling = useUIPreferencesStore(state => state.contentScaling);
   const [diagramLlm, llmComponent] = useFormRadioLlmType('Generator', 'chat');
 
   // derived state
-  const { messageId, text: subject } = props.config;
+  const { conversationId, messageId, text: subject } = props.config;
   const diagramLlmId = diagramLlm?.id;
 
-  // conversation handler (to view history and eventually append the message)
-  const cHandler = ConversationsManager.getHandler(props.config.conversationId);
 
   /**
    * Core Diagram Generation function, with Streaming, custom prompt, etc.
@@ -83,8 +79,13 @@ export function DiagramsModal(props: { config: DiagramConfig, onClose: () => voi
     if (abortController)
       return;
 
-    if (!diagramType || !diagramLanguage || !diagramLlm)
-      return setErrorMessage(`Invalid diagram Type, Language, or Model (${diagramLlm}).`);
+    const conversation = useChatStore.getState().conversations.find(c => c.id === conversationId);
+    if (!diagramType || !diagramLanguage || !diagramLlm || !conversation)
+      return setErrorMessage('Invalid diagram Type, Language, Generator, or conversation.');
+
+    const systemMessage = conversation?.messages?.length ? conversation.messages[0] : null;
+    if (systemMessage?.role !== 'system')
+      return setErrorMessage('No System message in this conversation');
 
     setErrorMessage(null);
 
@@ -93,28 +94,12 @@ export function DiagramsModal(props: { config: DiagramConfig, onClose: () => voi
 
     const stepAbortController = new AbortController();
     setAbortController(stepAbortController);
-    // cHandler.setAbortController(stepAbortController);
 
-    const reChatHistory = cHandler.historyViewHeadOrThrow('diagrams-modal');
-    const { chatSystemInstruction } = splitSystemMessageFromHistory(reChatHistory);
-    if (!chatSystemInstruction)
-      return setErrorMessage('No System instruction in this conversation');
+    const diagramPrompt = bigDiagramPrompt(diagramType, diagramLanguage, systemMessage.text, subject, customInstruction);
 
     try {
-      const { systemInstruction, messages } = bigDiagramPrompt(
-        diagramType,
-        diagramLanguage,
-        messageFragmentsReduceText(chatSystemInstruction.fragments),
-        subject,
-        customInstruction,
-      );
-      await aixChatGenerateText_Simple(
-        diagramLlm.id,
-        systemInstruction,
-        messages,
-        'ai-diagram', messageId,
-        { abortSignal: stepAbortController.signal },
-        (text) => !!text && setDiagramCode(diagramCode = text.trim()),
+      await llmStreamingChatGenerate(diagramLlm.id, diagramPrompt, 'ai-diagram', messageId, null, null, stepAbortController.signal,
+        ({ textSoFar }) => textSoFar && setDiagramCode(diagramCode = textSoFar),
       );
     } catch (error: any) {
       setDiagramCode(null);
@@ -124,18 +109,18 @@ export function DiagramsModal(props: { config: DiagramConfig, onClose: () => voi
       setAbortController(null);
     }
 
-  }, [abortController, cHandler, customInstruction, diagramLanguage, diagramLlm, diagramType, messageId, subject]);
+  }, [abortController, conversationId, customInstruction, diagramLanguage, diagramLlm, diagramType, messageId, subject]);
+
 
   // [Effect] Auto-abort on unmount
   React.useEffect(() => {
     return () => {
       if (abortController) {
         abortController.abort();
-        // cHandler.setAbortController(null);
         setAbortController(null);
       }
     };
-  }, [abortController, cHandler]);
+  }, [abortController]);
 
 
   // custom instruction
@@ -158,13 +143,13 @@ export function DiagramsModal(props: { config: DiagramConfig, onClose: () => voi
     if (!diagramCode)
       return setErrorMessage('Nothing to add to the conversation.');
 
-    const diagramMessage = createDMessageTextContent('assistant', diagramCode); // [chat] append assistant:diagram
+    const diagramMessage = createDMessage('assistant', diagramCode);
     // diagramMessage.purposeId = conversation.systemPurposeId;
-    diagramMessage.generator = { mgt: 'named', name: DIAGRAM_ACTOR_PREFIX + (diagramLlmId ? `-${diagramLlmId}` : '') };
+    diagramMessage.originLLM = DIAGRAM_ACTOR_PREFIX + (diagramLlmId ? `-${diagramLlmId}` : '');
 
-    cHandler.messageAppend(diagramMessage);
+    useChatStore.getState().appendMessage(conversationId, diagramMessage);
     props.onClose();
-  }, [cHandler, diagramCode, diagramLlmId, props]);
+  }, [conversationId, diagramCode, diagramLlmId, props]);
 
 
   // [effect] Auto-switch language to match diagram type
@@ -235,16 +220,13 @@ export function DiagramsModal(props: { config: DiagramConfig, onClose: () => voi
           p: { xs: 1, md: 2 },
           overflow: 'hidden',
         }}>
-          <AutoBlocksRenderer
+          <BlocksRenderer
             text={diagramCode}
             fromRole='assistant'
-            contentScaling={adjustContentScaling(contentScaling, -1)}
             fitScreen={isMobile}
-            isMobile={isMobile}
-            blocksProcessor='diagram'
-            codeRenderVariant='plain'
-            textRenderVariant='text'
-            // Edit is moved from the BlocksRenderer to the ContentPartText
+            contentScaling={adjustContentScaling(contentScaling, -1)}
+            renderTextAsMarkdown={false}
+            specialDiagramMode
             // onMessageEdit={(text) => setMessage({ ...message, text })}
           />
         </Box>
@@ -271,11 +253,7 @@ export function DiagramsModal(props: { config: DiagramConfig, onClose: () => voi
           <Button
             variant={abortController ? 'soft' : 'solid'} color='primary'
             disabled={!diagramLlm}
-            onClick={abortController ? () => {
-              abortController.abort();
-              // cHandler.setAbortController(null);
-              setAbortController(null);
-            } : handleGenerateNew}
+            onClick={abortController ? () => abortController.abort() : handleGenerateNew}
             endDecorator={abortController ? <StopOutlinedIcon /> : diagramCode ? <ReplayIcon /> : <AccountTreeTwoToneIcon />}
             sx={{ minWidth: isMobile ? 160 : 220 }}
           >

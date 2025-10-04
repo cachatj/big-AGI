@@ -7,7 +7,7 @@ import { isPwa } from '~/common/util/pwaUtils';
 import { useUIPreferencesStore } from '~/common/state/store-ui';
 
 import { PageCore } from './PageCore';
-import { useOptimaDrawerOpen, useOptimaPanelOpen } from './useOptima';
+import { useOptimaDrawers } from './useOptimaDrawers';
 
 
 /**
@@ -15,25 +15,20 @@ import { useOptimaDrawerOpen, useOptimaPanelOpen } from './useOptima';
  *  - mobile: just the 100dvh pageCore
  *  - desktop: animated left margin (sync with the drawer) and centering via the Container, then the PageCore
  */
-export function PageWrapper(props: { component: React.ElementType, currentApp?: NavItemApp, isMobile: boolean, children: React.ReactNode }) {
+export function PageWrapper(props: { component: React.ElementType, currentApp?: NavItemApp, isMobile?: boolean, children: React.ReactNode }) {
 
   // external state
-  const isDrawerOpen = useOptimaDrawerOpen();
-  const isPanelOpen = useOptimaPanelOpen();
+  const { isDrawerOpen } = useOptimaDrawers();
   const amplitude = useUIPreferencesStore(state =>
     (isPwa() || props.isMobile || props.currentApp?.fullWidth) ? 'full' : state.centerMode,
   );
 
-  // mobile: match the desktop container structure, to keep state across layour changes
+  // mobile: no outer containers
   if (props.isMobile)
     return (
-      <Box>
-        <Container id='app-page-container' disableGutters maxWidth={false}>
-          <PageCore component={props.component} currentApp={props.currentApp} isMobile={true}>
-            {props.children}
-          </PageCore>
-        </Container>
-      </Box>
+      <PageCore component={props.component} isMobile currentApp={props.currentApp}>
+        {props.children}
+      </PageCore>
     );
 
   return (
@@ -51,16 +46,12 @@ export function PageWrapper(props: { component: React.ElementType, currentApp?: 
         marginLeft: !isDrawerOpen
           ? 'calc(-1 * var(--AGI-Desktop-Drawer-width))'
           : 0,
-        marginRight: !isPanelOpen
-          ? 'calc(-1 * var(--AGI-Desktop-Panel-width))'
-          : 0,
-        transition: 'margin-left 0.42s cubic-bezier(.17,.84,.44,1), margin-right 0.42s cubic-bezier(.17,.84,.44,1)',
-        willChange: 'margin-left, margin-right',
+        transition: 'margin-left 0.42s cubic-bezier(.17,.84,.44,1)',
+        willChange: 'margin-left',
       }}
     >
 
       <Container
-        id='app-page-container'
         disableGutters
         maxWidth={amplitude === 'full' ? false : amplitude === 'narrow' ? 'md' : 'xl'}
         sx={{
@@ -72,7 +63,7 @@ export function PageWrapper(props: { component: React.ElementType, currentApp?: 
         }}
       >
 
-        <PageCore component={props.component} currentApp={props.currentApp} isMobile={false}>
+        <PageCore component={props.component} currentApp={props.currentApp}>
           {props.children}
         </PageCore>
 

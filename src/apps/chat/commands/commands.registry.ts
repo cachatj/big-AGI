@@ -1,25 +1,27 @@
 import { ChatCommand, ICommandsProvider } from './ICommandsProvider';
 
 import { CommandsAlter } from './CommandsAlter';
+import { CommandsBeam } from './CommandsBeam';
 import { CommandsBrowse } from './CommandsBrowse';
 import { CommandsDraw } from './CommandsDraw';
 import { CommandsHelp } from './CommandsHelp';
 import { CommandsReact } from './CommandsReact';
 
 
-export type CommandsProviderId = 'cmd-ass-browse' | 'cmd-ass-t2i' | 'cmd-chat-alter' | 'cmd-help' | 'cmd-mode-react';
+export type CommandsProviderId = 'ass-browse' | 'ass-t2i' | 'ass-react' | 'chat-alter' | 'cmd-help' | 'mode-beam';
 
 type TextCommandPiece =
-  | { type: 'nocmd'; value: string; }
-  | { type: 'cmd'; providerId: CommandsProviderId, command: string; params?: string, isErrorNoArgs?: boolean };
+  | { type: 'text'; value: string; }
+  | { type: 'cmd'; providerId: CommandsProviderId, command: string; params?: string, isError?: boolean };
 
 
 const ChatCommandsProviders: Record<CommandsProviderId, ICommandsProvider> = {
-  'cmd-ass-browse': CommandsBrowse,
-  'cmd-ass-t2i': CommandsDraw,
-  'cmd-chat-alter': CommandsAlter,
+  'ass-browse': CommandsBrowse,
+  'ass-react': CommandsReact,
+  'ass-t2i': CommandsDraw,
+  'chat-alter': CommandsAlter,
   'cmd-help': CommandsHelp,
-  'cmd-mode-react': CommandsReact,
+  'mode-beam': CommandsBeam,
 };
 
 export function findAllChatCommands(): ChatCommand[] {
@@ -29,18 +31,12 @@ export function findAllChatCommands(): ChatCommand[] {
     .flat();
 }
 
-export function helpPrettyChatCommands() {
-  return findAllChatCommands()
-    .map(cmd => ` - ${cmd.primary}` + (cmd.alternatives?.length ? ` (${cmd.alternatives.join(', ')})` : '') + `: ${cmd.description}`)
-    .join('\n');
-}
-
 export function extractChatCommand(input: string): TextCommandPiece[] {
   const inputTrimmed = input.trim();
 
   // quick exit: command does not start with '/'
   if (!inputTrimmed.startsWith('/'))
-    return [{ type: 'nocmd', value: input }];
+    return [{ type: 'text', value: input }];
 
   // Find the first space to separate the command from its parameters (if any)
   const firstSpaceIndex = inputTrimmed.indexOf(' ');
@@ -60,7 +56,7 @@ export function extractChatCommand(input: string): TextCommandPiece[] {
           providerId: provider.id,
           command: potentialCommand,
           params: textAfterCommand || undefined,
-          isErrorNoArgs: !textAfterCommand,
+          isError: !textAfterCommand || undefined,
         }];
 
         // command without arguments, treat any text after as a separate text piece
@@ -71,7 +67,7 @@ export function extractChatCommand(input: string): TextCommandPiece[] {
           params: undefined,
         }];
         textAfterCommand && pieces.push({
-          type: 'nocmd',
+          type: 'text',
           value: textAfterCommand,
         });
         return pieces;
@@ -81,7 +77,7 @@ export function extractChatCommand(input: string): TextCommandPiece[] {
 
   // No command found, return the entire input as text
   return [{
-    type: 'nocmd',
+    type: 'text',
     value: input,
   }];
 }

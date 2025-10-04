@@ -3,29 +3,31 @@ import { MistralIcon } from '~/common/components/icons/vendors/MistralIcon';
 import type { IModelVendor } from '../IModelVendor';
 import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
 
-import { DOpenAIServiceSettings, ModelVendorOpenAI } from '../openai/openai.vendor';
+import { LLMOptionsOpenAI, ModelVendorOpenAI, SourceSetupOpenAI } from '../openai/openai.vendor';
+import { OpenAILLMOptions } from '../openai/OpenAILLMOptions';
 
-import { MistralServiceSetup } from './MistralServiceSetup';
+import { MistralSourceSetup } from './MistralSourceSetup';
 
 
 // special symbols
 
-type DMistralServiceSettings = Pick<DOpenAIServiceSettings, 'oaiKey' | 'oaiHost'>;
+export type SourceSetupMistral = Pick<SourceSetupOpenAI, 'oaiKey' | 'oaiHost'>;
 
 
 /** Implementation Notes for the Mistral vendor
  */
-export const ModelVendorMistral: IModelVendor<DMistralServiceSettings, OpenAIAccessSchema> = {
+export const ModelVendorMistral: IModelVendor<SourceSetupMistral, OpenAIAccessSchema, LLMOptionsOpenAI> = {
   id: 'mistral',
   name: 'Mistral',
-  displayRank: 18,
+  rank: 15,
   location: 'cloud',
   instanceLimit: 1,
   hasBackendCapKey: 'hasLlmMistral',
 
   // components
   Icon: MistralIcon,
-  ServiceSetupComponent: MistralServiceSetup,
+  SourceSetupComponent: MistralSourceSetup,
+  LLMOptionsComponent: OpenAILLMOptions,
 
   // functions
   initializeSetup: () => ({
@@ -46,5 +48,6 @@ export const ModelVendorMistral: IModelVendor<DMistralServiceSettings, OpenAIAcc
 
   // OpenAI transport ('mistral' dialect in 'access')
   rpcUpdateModelsOrThrow: ModelVendorOpenAI.rpcUpdateModelsOrThrow,
-
+  rpcChatGenerateOrThrow: ModelVendorOpenAI.rpcChatGenerateOrThrow,
+  streamingChatGenerateOrThrow: ModelVendorOpenAI.streamingChatGenerateOrThrow,
 };

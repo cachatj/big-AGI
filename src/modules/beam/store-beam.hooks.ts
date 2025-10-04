@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { type StoreApi, useStore } from 'zustand';
 
-import type { BeamStore } from './store-beam_vanilla';
+import type { BeamStore } from './store-beam-vanilla';
 
 
 export type BeamStoreApi = Readonly<StoreApi<BeamStore>>;

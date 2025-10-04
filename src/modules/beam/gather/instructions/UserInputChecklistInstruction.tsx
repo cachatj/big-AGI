@@ -1,7 +1,7 @@
-import { bareBonesPromptMixer } from '~/modules/persona/pmix/pmix';
-
 import type { BaseInstruction, ExecutionInputState } from './beam.gather.execution';
+
 import { parseTextToChecklist, UserInputChecklistComponent } from './UserInputChecklistComponent';
+import { bareBonesPromptMixer } from '~/modules/persona/pmix/pmix';
 
 
 export interface UserInputChecklistInstruction extends BaseInstruction {
@@ -16,18 +16,18 @@ export interface UserChecklistOption {
 }
 
 
-export async function executeUserInputChecklistInstruction(
+export async function executeUserInputChecklist(
   _i: UserInputChecklistInstruction,
   inputs: ExecutionInputState,
-  prevStepOutput: string,
+  previousResult: string,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
 
     // initial text to options
-    let options = parseTextToChecklist(prevStepOutput, false);
+    let options = parseTextToChecklist(previousResult, false);
     const relaxMatch = options.length < 2;
     if (relaxMatch)
-      options = parseTextToChecklist(prevStepOutput, true);
+      options = parseTextToChecklist(previousResult, true);
 
     // if no options, there's an error
     if (options.length < 2) {
@@ -36,9 +36,7 @@ export async function executeUserInputChecklistInstruction(
     }
 
     // react to aborts
-    const abortHandler = () => {
-      reject(new Error('Checklist Selection Stopped.'));
-    };
+    const abortHandler = () => reject(new Error('Checklist Selection Stopped.'));
     inputs.chainAbortController.signal.addEventListener('abort', abortHandler);
 
     const clearState = () => {
@@ -69,13 +67,7 @@ export async function executeUserInputChecklistInstruction(
     inputs.updateProgressComponent(null);
 
     // Update the instruction component to render the checklist
-    inputs.updateInstructionComponent(
-      <UserInputChecklistComponent
-        options={options}
-        onCancel={onCancel}
-        onConfirm={onConfirm}
-      />,
-    );
+    inputs.updateInstructionComponent(<UserInputChecklistComponent options={options} onConfirm={onConfirm} onCancel={onCancel} />);
 
   });
 }

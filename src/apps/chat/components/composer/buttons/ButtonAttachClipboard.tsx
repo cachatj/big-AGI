@@ -4,39 +4,27 @@ import { Box, Button, IconButton, Tooltip } from '@mui/joy';
 import ContentPasteGoIcon from '@mui/icons-material/ContentPasteGo';
 
 import { KeyStroke } from '~/common/components/KeyStroke';
-import { buttonAttachSx } from '~/common/components/ButtonAttachFiles';
+
+
+const pasteClipboardLegend =
+  <Box sx={{ px: 1, py: 0.75, lineHeight: '1.5rem' }}>
+    <b>Attach clipboard 📚</b><br />
+    Auto-converts to the best types<br />
+    <KeyStroke combo='Ctrl + Shift + V' sx={{ mt: 1, mb: 0.5 }} />
+  </Box>;
 
 
 export const ButtonAttachClipboardMemo = React.memo(ButtonAttachClipboard);
 
-function ButtonAttachClipboard(props: {
-  isMobile?: boolean,
-  disabled?: boolean,
-  fullWidth?: boolean,
-  noToolTip?: boolean,
-  onAttachClipboard: () => void,
-}) {
+function ButtonAttachClipboard(props: { isMobile?: boolean, onClick: () => void }) {
   return props.isMobile ? (
-    <IconButton disabled={props.disabled} onClick={props.onAttachClipboard}>
+    <IconButton onClick={props.onClick}>
       <ContentPasteGoIcon />
     </IconButton>
   ) : (
-    <Tooltip arrow disableInteractive placement='top-start' title={props.noToolTip ? null : (
-      <Box sx={buttonAttachSx.tooltip}>
-        <b>Attach clipboard 📚</b><br />
-        Auto-converts to the best types<br />
-        <KeyStroke combo='Ctrl + Shift + V' sx={{ mt: 1, mb: 0.5 }} />
-      </Box>
-    )}>
-      <Button
-        variant='plain'
-        color='neutral'
-        disabled={props.disabled}
-        fullWidth={props.fullWidth}
-        startDecorator={<ContentPasteGoIcon />}
-        onClick={props.onAttachClipboard}
-        sx={buttonAttachSx.desktop}
-      >
+    <Tooltip disableInteractive variant='solid' placement='top-start' title={pasteClipboardLegend}>
+      <Button fullWidth variant='plain' color='neutral' startDecorator={<ContentPasteGoIcon />} onClick={props.onClick}
+              sx={{ justifyContent: 'flex-start' }}>
         Paste
       </Button>
     </Tooltip>

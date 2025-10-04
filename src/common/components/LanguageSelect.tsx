@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { shallow } from 'zustand/shallow';
 
 import { Option, Select } from '@mui/joy';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -12,12 +13,11 @@ import languages from './Languages.json';
 
 export function LanguageSelect() {
   // external state
-
-  const preferredLanguage = useUIPreferencesStore(state => state.preferredLanguage);
+  const { preferredLanguage, setPreferredLanguage } = useUIPreferencesStore(state => ({ preferredLanguage: state.preferredLanguage, setPreferredLanguage: state.setPreferredLanguage }), shallow);
 
   const handleLanguageChanged = (_event: any, newValue: string | null) => {
     if (!newValue) return;
-    useUIPreferencesStore.getState().setPreferredLanguage(newValue as string);
+    setPreferredLanguage(newValue as string);
 
     // NOTE: disabled, to make sure the code can be adapted at runtime - will re-enable to trigger translations, if not dynamically switchable
     //if (isBrowser)

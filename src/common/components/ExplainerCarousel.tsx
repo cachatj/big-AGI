@@ -8,15 +8,14 @@ import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 
-import { ScaledTextBlockRenderer } from '~/modules/blocks/ScaledTextBlockRenderer';
+import { BlocksRenderer } from '~/modules/blocks/BlocksRenderer';
 
 import { AgiSquircleIcon } from '~/common/components/icons/AgiSquircleIcon';
 import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
-import { ShortcutKey, useGlobalShortcuts } from '~/common/components/shortcuts/useGlobalShortcuts';
-import { animationTextShadowLimey } from '~/common/util/animUtils';
+import { GlobalShortcutItem, ShortcutKeyName, useGlobalShortcuts } from '~/common/components/useGlobalShortcut';
 import { hasGoogleAnalytics } from '~/common/components/GoogleAnalytics';
 import { useIsMobile } from '~/common/components/useMatchMedia';
-import { useUIContentScaling } from '~/common/state/store-ui';
+import { animationTextShadowLimey } from '~/common/util/animUtils';
 
 
 // configuration
@@ -127,7 +126,6 @@ export function ExplainerCarousel(props: {
 
   // external state
   const isMobile = useIsMobile();
-  const contentScaling = useUIContentScaling();
 
   // derived state
   const { onFinished } = props;
@@ -161,10 +159,11 @@ export function ExplainerCarousel(props: {
   }, [props.explainerId]);
 
 
-  useGlobalShortcuts('ExplainerCarousel', React.useMemo(() => [
-    { key: ShortcutKey.Left, action: handlePrevPage },
-    { key: ShortcutKey.Right, action: handleNextPage },
-  ], [handleNextPage, handlePrevPage]));
+  const shortcuts = React.useMemo((): GlobalShortcutItem[] => [
+    [ShortcutKeyName.Left, false, false, false, handlePrevPage],
+    [ShortcutKeyName.Right, false, false, false, handleNextPage],
+  ], [handleNextPage, handlePrevPage]);
+  useGlobalShortcuts(shortcuts);
 
 
   // [effect] restart from 0 if steps change
@@ -231,10 +230,12 @@ export function ExplainerCarousel(props: {
               '--color-canvas-default': 'transparent!important',
             },
           }}>
-            <ScaledTextBlockRenderer
+            <BlocksRenderer
               text={mdText}
-              contentScaling={contentScaling /* was: 'md' */}
-              textRenderVariant='markdown'
+              fromRole='assistant'
+              contentScaling='md'
+              fitScreen={isMobile}
+              renderTextAsMarkdown
             />
           </Box>
         )}

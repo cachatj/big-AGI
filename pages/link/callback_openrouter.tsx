@@ -2,19 +2,20 @@ import * as React from 'react';
 
 import { Box, Typography } from '@mui/joy';
 
-import { llmsStoreActions } from '~/common/stores/llms/store-llms';
+import { useModelsStore } from '~/modules/llms/store-llms';
 
 import { InlineError } from '~/common/components/InlineError';
 import { apiQuery } from '~/common/util/trpc.client';
 import { navigateToIndex, useRouterQuery } from '~/common/app.routes';
-import { withNextJSPerPageLayout } from '~/common/layout/withLayout';
+import { withLayout } from '~/common/layout/withLayout';
 
 
 function CallbackOpenRouterPage(props: { openRouterCode: string | undefined }) {
 
   // external state
-  const { data, isError, error, isPending } = apiQuery.backend.exchangeOpenRouterKey.useQuery({ code: props.openRouterCode || '' }, {
+  const { data, isError, error, isLoading } = apiQuery.backend.exchangeOpenRouterKey.useQuery({ code: props.openRouterCode || '' }, {
     enabled: !!props.openRouterCode,
+    refetchOnWindowFocus: false,
     staleTime: Infinity,
   });
 
@@ -30,7 +31,7 @@ function CallbackOpenRouterPage(props: { openRouterCode: string | undefined }) {
       return;
 
     // 1. Save the key as the client key
-    llmsStoreActions().setOpenRouterKey(openRouterKey);
+    useModelsStore.getState().setOpenRoutersKey(openRouterKey);
 
     // 2. Navigate to the chat app
     void navigateToIndex(true); //.then(openModelsSetup);
@@ -55,7 +56,7 @@ function CallbackOpenRouterPage(props: { openRouterCode: string | undefined }) {
           Welcome Back
         </Typography>
 
-        {isPending && <Typography level='body-sm'>Loading...</Typography>}
+        {isLoading && <Typography level='body-sm'>Loading...</Typography>}
 
         {isErrorInput && <InlineError error='There was an issue retrieving the code from OpenRouter.' />}
 
@@ -80,11 +81,10 @@ function CallbackOpenRouterPage(props: { openRouterCode: string | undefined }) {
  * Docs: https://openrouter.ai/docs#oauth
  * Example URL: https://localhost:3000/link/callback_openrouter?code=SomeCode
  */
-export default withNextJSPerPageLayout({ type: 'container' }, () => {
+export default function CallbackPage() {
 
   // external state - get the 'code=...' from the URL
   const { code } = useRouterQuery<{ code: string | undefined }>();
 
-  return <CallbackOpenRouterPage openRouterCode={code} />;
-
-});
+  return withLayout({ type: 'plain' }, <CallbackOpenRouterPage openRouterCode={code} />);
+}

@@ -26,9 +26,5 @@ export const Brand = {
     SupportInvite: 'https://discord.gg/MkH4qj2Jp9',
     // Twitter: 'https://www.twitter.com/enricoros',
     PrivacyPolicy: 'https://big-agi.com/privacy',
-    TermsOfService: 'https://big-agi.com/terms',
   },
-  Docs: {
-    Public: (docPage: string) => `https://big-agi.com/docs/${docPage}`,
-  }
 } as const;

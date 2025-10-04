@@ -4,9 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type { SxProps, VariantProp } from '@mui/joy/styles/types';
 import { Alert, Box, Button, Typography, useTheme } from '@mui/joy';
 import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
-import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded';
-
-import { BrowserLang } from '~/common/util/pwaUtils';
+import LanguageIcon from '@mui/icons-material/Language';
 
 import { Fusion } from './Fusion';
 import { findFusionFactory, FusionFactorySpec } from './instructions/beam.gather.factories';
@@ -14,6 +12,7 @@ import { findFusionFactory, FusionFactorySpec } from './instructions/beam.gather
 import { BeamCard, beamCardClasses } from '../BeamCard';
 import { BeamStoreApi, useBeamStore } from '../store-beam.hooks';
 import { GATHER_COLOR } from '../beam.config';
+import { browserLangNotUS } from '~/common/util/pwaUtils';
 
 
 const fusionGridDesktopSx: SxProps = {
@@ -112,7 +111,6 @@ export function BeamFusionGrid(props: {
           key={'fusion-' + fusionId}
           beamStore={props.beamStore}
           fusionId={fusionId}
-          isMobile={props.isMobile}
         />
       ))}
 
@@ -156,12 +154,12 @@ export function BeamFusionGrid(props: {
       )}
 
       {/* Full-width warning if not */}
-      {BrowserLang.notUS && (
+      {browserLangNotUS && (
         <Alert color='warning' sx={{
           // full row of the grid
           gridColumn: '1 / -1',
         }}>
-          <Typography level='body-sm' color='warning' startDecorator={<LanguageRoundedIcon />}>
+          <Typography level='body-sm' color='warning' startDecorator={<LanguageIcon />}>
             Note: Merges are defined in English and have not been translated to your browser language ({navigator.language}) yet.
           </Typography>
         </Alert>

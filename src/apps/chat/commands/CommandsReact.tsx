@@ -3,7 +3,7 @@ import PsychologyIcon from '@mui/icons-material/Psychology';
 import type { ICommandsProvider } from './ICommandsProvider';
 
 export const CommandsReact: ICommandsProvider = {
-  id: 'cmd-mode-react',
+  id: 'ass-react',
   rank: 15,
 
   getCommands: () => [{

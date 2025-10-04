@@ -5,24 +5,23 @@ import { Box, Button, Typography } from '@mui/joy';
 
 import { BeamStoreApi, useBeamStore } from '~/modules/beam/store-beam.hooks';
 import { BeamView } from '~/modules/beam/BeamView';
-import { createBeamVanillaStore } from '~/modules/beam/store-beam_vanilla';
+import { createBeamVanillaStore } from '~/modules/beam/store-beam-vanilla';
+import { useModelsStore } from '~/modules/llms/store-llms';
 
-import { OptimaToolbarIn } from '~/common/layout/optima/portals/OptimaPortalsIn';
-import { createDConversation, DConversation } from '~/common/stores/chat/chat.conversation';
-import { createDMessageTextContent, DMessage } from '~/common/stores/chat/chat.message';
-import { getChatLLMId } from '~/common/stores/llms/store-llms';
+import { createDConversation, createDMessage, DConversation, DMessage } from '~/common/state/store-chats';
 import { useIsMobile } from '~/common/components/useMatchMedia';
+import { usePluggableOptimaLayout } from '~/common/layout/optima/useOptimaLayout';
 
 
 function initTestConversation(): DConversation {
   const conversation = createDConversation();
-  conversation.messages.push(createDMessageTextContent('system', 'You are a helpful assistant.')); // Beam Test - seed1
-  conversation.messages.push(createDMessageTextContent('user', 'Hello, who are you? (please expand...)')); // Beam Test - seed2
+  conversation.messages.push(createDMessage('system', 'You are a helpful assistant.'));
+  conversation.messages.push(createDMessage('user', 'Hello, who are you? (please expand...)'));
   return conversation;
 }
 
 function initTestBeamStore(messages: DMessage[], beamStore: BeamStoreApi = createBeamVanillaStore()): BeamStoreApi {
-  beamStore.getState().open(messages, getChatLLMId(), false, (content) => alert(content));
+  beamStore.getState().open(messages, useModelsStore.getState().chatLLMId, (text) => alert(text));
   return beamStore;
 }
 
@@ -57,7 +56,8 @@ export function AppBeam() {
   }, [beamStoreApi]);
 
 
-  const toolbarItems = React.useMemo(() => <>
+  // layout
+  usePluggableOptimaLayout(null, React.useMemo(() => <>
     {/* button to toggle debug info */}
     <Button size='sm' variant='plain' color='neutral' onClick={() => setShowDebug(on => !on)}>
       {showDebug ? 'Hide' : 'Show'} debug
@@ -72,12 +72,10 @@ export function AppBeam() {
     <Button size='sm' variant='plain' color='neutral' onClick={handleClose}>
       .close
     </Button>
-  </>, [handleClose, showDebug]);
+  </>, [handleClose, showDebug]), null, 'AppBeam');
 
 
-  return <>
-    <OptimaToolbarIn>{toolbarItems}</OptimaToolbarIn>
-
+  return (
     <Box sx={{ flexGrow: 1, overflowY: 'auto', position: 'relative' }}>
 
       {isOpen && (
@@ -103,6 +101,5 @@ export function AppBeam() {
       )}
 
     </Box>
-
-  </>;
+  );
 }

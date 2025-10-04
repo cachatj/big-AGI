@@ -1,16 +1,8 @@
 import * as React from 'react';
 
-import type { SxProps } from '@mui/joy/styles/types';
 import { FormControl, Input } from '@mui/joy';
 
 import { FormLabelStart } from './FormLabelStart';
-
-
-const formControlSx: SxProps = {
-  flexWrap: 'wrap',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-};
 
 
 /**
@@ -30,7 +22,9 @@ export function FormTextField(props: {
       id={acId}
       orientation='horizontal'
       disabled={props.disabled}
-      sx={formControlSx}
+      sx={{
+        flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center',
+      }}
     >
       <FormLabelStart title={props.title} description={props.description} tooltip={props.tooltip} />
       <Input

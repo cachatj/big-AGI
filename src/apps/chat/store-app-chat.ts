@@ -1,8 +1,7 @@
 import { create } from 'zustand';
+import { shallow } from 'zustand/shallow';
 import { persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
-
-import type { DLLMId } from '~/common/stores/llms/llms.types';
 
 
 export type ChatAutoSpeakType = 'off' | 'firstLine' | 'all';
@@ -17,14 +16,8 @@ interface AppChatStore {
   autoSpeak: ChatAutoSpeakType;
   setAutoSpeak: (autoSpeak: ChatAutoSpeakType) => void;
 
-  autoSuggestAttachmentPrompts: boolean;
-  setAutoSuggestAttachmentPrompts: (autoSuggestAttachmentPrompts: boolean) => void;
-
   autoSuggestDiagrams: boolean,
   setAutoSuggestDiagrams: (autoSuggestDiagrams: boolean) => void;
-
-  autoSuggestHTMLUI: boolean;
-  setAutoSuggestHTMLUI: (autoSuggestHTMLUI: boolean) => void;
 
   autoSuggestQuestions: boolean,
   setAutoSuggestQuestions: (autoSuggestQuestions: boolean) => void;
@@ -32,30 +25,19 @@ interface AppChatStore {
   autoTitleChat: boolean;
   setAutoTitleChat: (autoTitleChat: boolean) => void;
 
-  autoVndAntBreakpoints: boolean;
-  setAutoVndAntBreakpoints: (autoVndAntBreakpoints: boolean) => void;
-
   // chat UI
 
-  clearFilters: () => void;
-
-  filterHasDocFragments: boolean;
-  toggleFilterHasDocFragments: () => void;
-
-  filterHasImageAssets: boolean;
-  toggleFilterHasImageAssets: () => void;
-
   filterHasStars: boolean;
-  toggleFilterHasStars: () => void;
+  setFilterHasStars: (filterHasStars: boolean) => void;
 
   micTimeoutMs: number;
   setMicTimeoutMs: (micTimeoutMs: number) => void;
 
-  showPersonaIcons2: boolean;
-  toggleShowPersonaIcons: () => void;
+  showPersonaIcons: boolean;
+  setShowPersonaIcons: (showPersonaIcons: boolean) => void;
 
   showRelativeSize: boolean;
-  toggleShowRelativeSize: () => void;
+  setShowRelativeSize: (showRelativeSize: boolean) => void;
 
   showTextDiff: boolean;
   setShowTextDiff: (showTextDiff: boolean) => void;
@@ -63,31 +45,17 @@ interface AppChatStore {
   showSystemMessages: boolean;
   setShowSystemMessages: (showSystemMessages: boolean) => void;
 
-  // other chat-specific configuration
-
-  notificationEnabledModelIds: DLLMId[];
-  setNotificationEnabledForModel: (modelId: DLLMId, enabled: boolean) => void;
-  isNotificationEnabledForModel: (modelId: DLLMId) => boolean;
-
 }
 
 
 const useAppChatStore = create<AppChatStore>()(persist(
   (_set, _get) => ({
 
-    // Chat AI
-
     autoSpeak: 'off',
     setAutoSpeak: (autoSpeak: ChatAutoSpeakType) => _set({ autoSpeak }),
 
-    autoSuggestAttachmentPrompts: false,
-    setAutoSuggestAttachmentPrompts: (autoSuggestAttachmentPrompts: boolean) => _set({ autoSuggestAttachmentPrompts }),
-
     autoSuggestDiagrams: false,
     setAutoSuggestDiagrams: (autoSuggestDiagrams: boolean) => _set({ autoSuggestDiagrams }),
-
-    autoSuggestHTMLUI: false,
-    setAutoSuggestHTMLUI: (autoSuggestHTMLUI: boolean) => _set({ autoSuggestHTMLUI }),
 
     autoSuggestQuestions: false,
     setAutoSuggestQuestions: (autoSuggestQuestions: boolean) => _set({ autoSuggestQuestions }),
@@ -95,49 +63,23 @@ const useAppChatStore = create<AppChatStore>()(persist(
     autoTitleChat: true,
     setAutoTitleChat: (autoTitleChat: boolean) => _set({ autoTitleChat }),
 
-    autoVndAntBreakpoints: true, // 2024-08-24: on as it saves user's money
-    setAutoVndAntBreakpoints: (autoVndAntBreakpoints: boolean) => _set({ autoVndAntBreakpoints }),
-
-    // Chat UI
-
-    clearFilters: () => _set({ filterHasDocFragments: false, filterHasImageAssets: false, filterHasStars: false }),
-
-    filterHasDocFragments: false,
-    toggleFilterHasDocFragments: () => _set(({ filterHasDocFragments }) => ({ filterHasDocFragments: !filterHasDocFragments })),
-
-    filterHasImageAssets: false,
-    toggleFilterHasImageAssets: () => _set(({ filterHasImageAssets }) => ({ filterHasImageAssets: !filterHasImageAssets })),
-
     filterHasStars: false,
-    toggleFilterHasStars: () => _set(({ filterHasStars }) => ({ filterHasStars: !filterHasStars })),
+    setFilterHasStars: (filterHasStars: boolean) => _set({ filterHasStars }),
 
     micTimeoutMs: 2000,
     setMicTimeoutMs: (micTimeoutMs: number) => _set({ micTimeoutMs }),
 
-    // new default on 2024-11-18: disable icons by default, too confusing
-    showPersonaIcons2: false,
-    toggleShowPersonaIcons: () => _set(({ showPersonaIcons2 }) => ({ showPersonaIcons2: !showPersonaIcons2 })),
+    showPersonaIcons: true,
+    setShowPersonaIcons: (showPersonaIcons: boolean) => _set({ showPersonaIcons }),
 
     showRelativeSize: false,
-    toggleShowRelativeSize: () => _set(({ showRelativeSize }) => ({ showRelativeSize: !showRelativeSize })),
+    setShowRelativeSize: (showRelativeSize: boolean) => _set({ showRelativeSize }),
 
     showTextDiff: false,
     setShowTextDiff: (showTextDiff: boolean) => _set({ showTextDiff }),
 
     showSystemMessages: false,
     setShowSystemMessages: (showSystemMessages: boolean) => _set({ showSystemMessages }),
-
-    // Other chat-specific configuration
-
-    notificationEnabledModelIds: [],
-    setNotificationEnabledForModel: (modelId: DLLMId, enabled: boolean) => {
-      const notificationEnabledModelIds = _get().notificationEnabledModelIds;
-      if (!enabled)
-        _set({ notificationEnabledModelIds: notificationEnabledModelIds.filter(id => id !== modelId) });
-      else if (!notificationEnabledModelIds.includes(modelId))
-        _set({ notificationEnabledModelIds: [...notificationEnabledModelIds, modelId] });
-    },
-    isNotificationEnabledForModel: (modelId: DLLMId) => _get().notificationEnabledModelIds.includes(modelId),
 
   }), {
     name: 'app-app-chat',
@@ -160,72 +102,49 @@ const useAppChatStore = create<AppChatStore>()(persist(
 ));
 
 
-export const useChatAutoAI = () => useAppChatStore(useShallow(state => ({
+export const useChatAutoAI = () => useAppChatStore(state => ({
   autoSpeak: state.autoSpeak,
-  autoSuggestAttachmentPrompts: state.autoSuggestAttachmentPrompts,
   autoSuggestDiagrams: state.autoSuggestDiagrams,
-  autoSuggestHTMLUI: state.autoSuggestHTMLUI,
   autoSuggestQuestions: state.autoSuggestQuestions,
   autoTitleChat: state.autoTitleChat,
-  autoVndAntBreakpoints: state.autoVndAntBreakpoints,
   setAutoSpeak: state.setAutoSpeak,
-  setAutoSuggestAttachmentPrompts: state.setAutoSuggestAttachmentPrompts,
   setAutoSuggestDiagrams: state.setAutoSuggestDiagrams,
-  setAutoSuggestHTMLUI: state.setAutoSuggestHTMLUI,
   setAutoSuggestQuestions: state.setAutoSuggestQuestions,
   setAutoTitleChat: state.setAutoTitleChat,
-  setAutoVndAntBreakpoints: state.setAutoVndAntBreakpoints,
-})));
+}), shallow);
 
 export const getChatAutoAI = (): {
   autoSpeak: ChatAutoSpeakType,
-  autoSuggestAttachmentPrompts: boolean,
   autoSuggestDiagrams: boolean,
-  autoSuggestHTMLUI: boolean,
   autoSuggestQuestions: boolean,
   autoTitleChat: boolean,
-  autoVndAntBreakpoints: boolean,
 } => useAppChatStore.getState();
-
-export const useChatAutoSuggestHTMLUI = (): boolean =>
-  useAppChatStore(state => state.autoSuggestHTMLUI);
-
-export const useChatAutoSuggestAttachmentPrompts = (): boolean =>
-  useAppChatStore(state => state.autoSuggestAttachmentPrompts);
 
 export const useChatMicTimeoutMsValue = (): number =>
   useAppChatStore(state => state.micTimeoutMs);
 
 export const useChatMicTimeoutMs = (): [number, (micTimeoutMs: number) => void] =>
-  useAppChatStore(useShallow(state => [state.micTimeoutMs, state.setMicTimeoutMs]));
+  useAppChatStore(state => [state.micTimeoutMs, state.setMicTimeoutMs], shallow);
 
-export function useChatDrawerFilters() {
-  return useAppChatStore(useShallow(state => ({
-    filterHasDocFragments: state.filterHasDocFragments,
-    filterHasImageAssets: state.filterHasImageAssets,
+export const useChatDrawerFilters = () => {
+  const values = useAppChatStore(useShallow(state => ({
     filterHasStars: state.filterHasStars,
-    showPersonaIcons: state.showPersonaIcons2,
+    showPersonaIcons: state.showPersonaIcons,
     showRelativeSize: state.showRelativeSize,
-    clearFilters: state.clearFilters,
-    toggleFilterHasDocFragments: state.toggleFilterHasDocFragments,
-    toggleFilterHasImageAssets: state.toggleFilterHasImageAssets,
-    toggleFilterHasStars: state.toggleFilterHasStars,
-    toggleShowPersonaIcons: state.toggleShowPersonaIcons,
-    toggleShowRelativeSize: state.toggleShowRelativeSize,
   })));
-}
+  return {
+    ...values,
+    toggleFilterHasStars: () => useAppChatStore.getState().setFilterHasStars(!values.filterHasStars),
+    toggleShowPersonaIcons: () => useAppChatStore.getState().setShowPersonaIcons(!values.showPersonaIcons),
+    toggleShowRelativeSize: () => useAppChatStore.getState().setShowRelativeSize(!values.showRelativeSize),
+  };
+};
 
 export const useChatShowTextDiff = (): [boolean, (showDiff: boolean) => void] =>
-  useAppChatStore(useShallow(state => [state.showTextDiff, state.setShowTextDiff]));
+  useAppChatStore(state => [state.showTextDiff, state.setShowTextDiff], shallow);
 
 export const getChatShowSystemMessages = (): boolean =>
   useAppChatStore.getState().showSystemMessages;
 
 export const useChatShowSystemMessages = (): [boolean, (showSystemMessages: boolean) => void] =>
-  useAppChatStore(useShallow(state => [state.showSystemMessages, state.setShowSystemMessages]));
-
-export const getIsNotificationEnabledForModel = (modelId: DLLMId): boolean =>
-  useAppChatStore.getState().isNotificationEnabledForModel(modelId);
-
-export const setIsNotificationEnabledForModel = (modelId: DLLMId, enabled: boolean) =>
-  useAppChatStore.getState().setNotificationEnabledForModel(modelId, enabled);
+  useAppChatStore(state => [state.showSystemMessages, state.setShowSystemMessages], shallow);

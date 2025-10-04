@@ -3,15 +3,16 @@ import { AzureIcon } from '~/common/components/icons/vendors/AzureIcon';
 import type { IModelVendor } from '../IModelVendor';
 import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
 
-import { ModelVendorOpenAI } from '../openai/openai.vendor';
+import { LLMOptionsOpenAI, ModelVendorOpenAI } from '../openai/openai.vendor';
+import { OpenAILLMOptions } from '../openai/OpenAILLMOptions';
 
-import { AzureServiceSetup } from './AzureServiceSetup';
+import { AzureSourceSetup } from './AzureSourceSetup';
 
 
 // special symbols
 export const isValidAzureApiKey = (apiKey?: string) => !!apiKey && apiKey.length >= 32;
 
-interface DAzureServiceSettings {
+export interface SourceSetupAzure {
   azureEndpoint: string;
   azureKey: string;
 }
@@ -32,17 +33,18 @@ interface DAzureServiceSettings {
  *
  * Work in progress...
  */
-export const ModelVendorAzure: IModelVendor<DAzureServiceSettings, OpenAIAccessSchema> = {
+export const ModelVendorAzure: IModelVendor<SourceSetupAzure, OpenAIAccessSchema, LLMOptionsOpenAI> = {
   id: 'azure',
   name: 'Azure',
-  displayRank: 30,
+  rank: 14,
   location: 'cloud',
   instanceLimit: 2,
   hasBackendCapKey: 'hasLlmAzureOpenAI',
 
   // components
   Icon: AzureIcon,
-  ServiceSetupComponent: AzureServiceSetup,
+  SourceSetupComponent: AzureSourceSetup,
+  LLMOptionsComponent: OpenAILLMOptions,
 
   // functions
   getTransportAccess: (partialSetup): OpenAIAccessSchema => ({
@@ -56,5 +58,6 @@ export const ModelVendorAzure: IModelVendor<DAzureServiceSettings, OpenAIAccessS
 
   // OpenAI transport ('azure' dialect in 'access')
   rpcUpdateModelsOrThrow: ModelVendorOpenAI.rpcUpdateModelsOrThrow,
-
+  rpcChatGenerateOrThrow: ModelVendorOpenAI.rpcChatGenerateOrThrow,
+  streamingChatGenerateOrThrow: ModelVendorOpenAI.streamingChatGenerateOrThrow,
 };
