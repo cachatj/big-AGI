@@ -3,10 +3,11 @@ import { addDBImageAsset } from '~/common/stores/blob/dblobs-portability';
 import type { MaybePromise } from '~/common/types/useful.types';
 import { DEFAULT_ADRAFT_IMAGE_MIMETYPE } from '~/common/attachment-drafts/attachment.pipeline';
 import { convert_Base64WithMimeType_To_Blob } from '~/common/util/blobUtils';
-import { create_CodeExecutionInvocation_ContentFragment, create_CodeExecutionResponse_ContentFragment, create_FunctionCallInvocation_ContentFragment, createAnnotationsVoidFragment, createDMessageDataRefDBlob, createDVoidWebCitation, createErrorContentFragment, createImageContentFragment, createModelAuxVoidFragment, createTextContentFragment, DVoidModelAuxPart, isContentFragment, isModelAuxPart, isTextContentFragment, isVoidAnnotationsFragment, isVoidFragment } from '~/common/stores/chat/chat.fragments';
+import { create_CodeExecutionInvocation_ContentFragment, create_CodeExecutionResponse_ContentFragment, create_FunctionCallInvocation_ContentFragment, createAnnotationsVoidFragment, createDMessageDataRefDBlob, createDVoidWebCitation, createErrorContentFragment, createModelAuxVoidFragment, createPlaceholderVoidFragment, createTextContentFragment, createZyncAssetReferenceContentFragment, DVoidModelAuxPart, DVoidPlaceholderModelOp, isContentFragment, isModelAuxPart, isTextContentFragment, isVoidAnnotationsFragment, isVoidFragment } from '~/common/stores/chat/chat.fragments';
 import { ellipsizeMiddle } from '~/common/util/textUtils';
 import { imageBlobTransform } from '~/common/util/imageUtils';
 import { metricsFinishChatGenerateLg, metricsPendChatGenerateLg } from '~/common/stores/metrics/metrics.chatgenerate';
+import { nanoidToUuidV4 } from '~/common/util/idUtils';
 import { presentErrorToHumans } from '~/common/util/errorUtils';
 
 import type { AixWire_Particles } from '../server/api/aix.wiretypes';
@@ -22,7 +23,6 @@ const GENERATED_IMAGES_CONVERT_TO_COMPRESSED = true; // converts PNG to WebP or 
 const GENERATED_IMAGES_COMPRESSION_QUALITY = 0.98;
 const ELLIPSIZE_DEV_ISSUE_MESSAGES = 4096;
 const MERGE_ISSUES_INTO_TEXT_PART_IF_OPEN = true;
-const DEBUG_LOG_PROFILER_ON_CLIENT = false; // print Profiling particles when they come in, otherwise ignore them
 
 
 /**
@@ -95,7 +95,7 @@ export class ContentReassembler {
     if (DEBUG_PARTICLES)
       console.log('-> aix.p: abort-client');
 
-    // NOTE: this doens't go to the debugger anymore - as we only publish external particles to the debugger
+    // NOTE: this doesn't go to the debugger anymore - as we only publish external particles to the debugger
     await this.#reassembleParticle({ cg: 'end', reason: 'abort-client', tokenStopReason: 'client-abort-signal' });
   }
 
@@ -105,7 +105,7 @@ export class ContentReassembler {
 
     this.onCGIssue({ cg: 'issue', issueId: 'client-read', issueText: errorAsText });
 
-    // NOTE: this doens't go to the debugger anymore - as we only publish external particles to the debugger
+    // NOTE: this doesn't go to the debugger anymore - as we only publish external particles to the debugger
     await this.#reassembleParticle({ cg: 'end', reason: 'issue-rpc', tokenStopReason: 'cg-issue' });
   }
 
@@ -189,6 +189,11 @@ export class ContentReassembler {
   /// Particle Reassembly ///
 
   async #reassembleParticle(op: AixWire_Particles.ChatGenerateOp): Promise<void> {
+
+    // remove placeholder if any other content except heartbeat or void-placeholder
+    if (!('p' in op) || !(op.p === '❤' || op.p === 'vp'))
+      this.removePlaceholderIfAtIndex0();
+
     switch (true) {
 
       // TextParticleOp
@@ -232,6 +237,9 @@ export class ContentReassembler {
           case 'urlc':
             this.onAddUrlCitation(op);
             break;
+          case 'vp':
+            this.onVoidPlaceholder(op);
+            break;
           default:
             // noinspection JSUnusedLocalSymbols
             const _exhaustiveCheck: never = op;
@@ -249,13 +257,6 @@ export class ContentReassembler {
           case '_debugProfiler':
             if (this.debuggerFrameId)
               aixClientDebugger_setProfilerMeasurements(this.debuggerFrameId, op.measurements);
-            // Profiling particles will come in if the app is in "Debug Mode" + it's a Development build!
-            // Additionally to show them on the console (rather than just in the debugger) set the
-            // constant to `true`.
-            if (DEBUG_LOG_PROFILER_ON_CLIENT) {
-              console.warn('[AIX] chatGenerate profiler measurements:');
-              console.table(op.measurements);
-            }
             break;
           case 'end':
             this.onCGEnd(op);
@@ -494,6 +495,7 @@ export class ContentReassembler {
       });
 
       // add the image to the DBlobs DB
+      // FIXME: [ASSET] use the Asset Store
       const dblobAssetId = await addDBImageAsset('app-chat', imageBlob, {
         label: safeLabel,
         metadata: {
@@ -511,20 +513,21 @@ export class ContentReassembler {
         },
       });
 
-      // create the DMessage _Content_ Fragment (not attachment), as this comes from the assistant
-      // so this is akin to the t2i-generated images
-      const imageContentFragment = createImageContentFragment(
-        createDMessageDataRefDBlob( // Data Reference {} for the image
-          dblobAssetId,
-          imageBlob.type,
-          imageBlob.size,
-        ),
-        safeLabel,
-        imageWidth || undefined,
-        imageHeight || undefined,
+      // Create a Zync Image Asset Reference *Content* fragment, as this is image content from the LLM
+      const zyncImageAssetFragmentWithLegacy = createZyncAssetReferenceContentFragment(
+        nanoidToUuidV4(dblobAssetId, 'convert-dblob-to-dasset'),
+        prompt || safeLabel, // use prompt if available, otherwise use the label
+        'image',
+        {
+          pt: 'image_ref' as const,
+          dataRef: createDMessageDataRefDBlob(dblobAssetId, imageBlob.type, imageBlob.size),
+          ...(safeLabel ? { altText: safeLabel } : {}),
+          ...(imageWidth ? { width: imageWidth } : {}),
+          ...(imageHeight ? { height: imageHeight } : {}),
+        }
       );
 
-      this.accumulator.fragments.push(imageContentFragment);
+      this.accumulator.fragments.push(zyncImageAssetFragmentWithLegacy);
     } catch (error: any) {
       console.warn('[DEV] Failed to add inline image to DBlobs:', { label, error, inputType, base64Length: inputBase64.length });
     }
@@ -564,6 +567,40 @@ export class ContentReassembler {
 
     // Important: Don't reset currentTextFragmentIndex to allow text to continue
     // This ensures we don't interrupt the text flow
+  }
+
+  private onVoidPlaceholder(vp: Extract<AixWire_Particles.PartParticleOp, { p: 'vp' }>): void {
+    const { text, mot } = vp;
+
+    // update the model op
+    const modelOp: DVoidPlaceholderModelOp = { mot, cts: Date.now() };
+
+    // Only reuse placeholder if it's at index 0
+    if (this.accumulator.fragments.length > 0) {
+      const firstFragment = this.accumulator.fragments[0];
+      if (firstFragment.ft === 'void' && firstFragment.part.pt === 'ph') {
+        // Update existing placeholder at index 0
+        firstFragment.part.pText = text;
+        firstFragment.part.modelOp = modelOp;
+        return;
+      }
+    }
+
+    // Create new placeholder at the beginning (will be index 0)
+    const placeholderFragment = createPlaceholderVoidFragment(text, undefined, modelOp);
+    this.accumulator.fragments.unshift(placeholderFragment); // Add to beginning
+
+    // Placeholders don't affect text fragment indexing
+  }
+
+  // Helper to remove placeholder when real content arrives
+  private removePlaceholderIfAtIndex0(): void {
+    if (this.accumulator.fragments.length > 0) {
+      const firstFragment = this.accumulator.fragments[0];
+      if (firstFragment.ft === 'void' && firstFragment.part.pt === 'ph') {
+        this.accumulator.fragments.shift(); // Remove placeholder at index 0
+      }
+    }
   }
 
 
@@ -616,7 +653,7 @@ export class ContentReassembler {
       const currentTextFragment = this.currentTextFragmentIndex === null ? null
         : this.accumulator.fragments[this.currentTextFragmentIndex];
       if (currentTextFragment && isTextContentFragment(currentTextFragment)) {
-        currentTextFragment.part.text += ' ' + issueText;
+        currentTextFragment.part.text += (currentTextFragment.part.text ? '\n' : ' ') + issueText;
         return;
       }
     }

@@ -47,6 +47,14 @@ export type DMessageRole = 'user' | 'assistant' | 'system';
 
 export interface DMessageMetadata {
   inReferenceTo?: DMetaReferenceItem[]; // text this was in reply to
+  entangled?: DMessageEntangled; // entangled messages info
+  /**
+   * Initially intended recipients of this message.
+   * Defaults to `undefined` i.e. the current persona for the active operation (chat, beam, etc).
+   * If set, has to be honored by the UI and the sending operation.
+   */
+  initialRecipients?: DMessageRecipientPersona[];
+  // NOTE: if adding fields, manually update `duplicateDMessageMetadata`
 }
 
 /** A textual reference to a text snipped, by a certain role. */
@@ -55,6 +63,19 @@ export interface DMetaReferenceItem {
   mText: string;
   mRole: DMessageRole;
   // messageId?: string;
+}
+
+/** Entangled messages info for coordinated multi-chat operations. */
+export interface DMessageEntangled {
+  id: string;           // entanglement group ID
+  color: string;        // hex color for visual connection
+  count: number;        // total number of chats this was sent to
+}
+
+/** Recipient of a message - currently persona-based but extensible for future recipient types. */
+export interface DMessageRecipientPersona {
+  rt: 'persona'; // recipient type discriminant
+  personaUid: string | null; // null = explicit "no persona"
 }
 
 
@@ -169,8 +190,18 @@ export function duplicateDMessage(message: Readonly<DMessage>, skipVoid: boolean
 }
 
 export function duplicateDMessageMetadata(metadata: Readonly<DMessageMetadata>): DMessageMetadata {
-  // TODO: deep copy this?
-  return { ...metadata };
+  // NOTE: update this function when adding metadata fields
+  return {
+    ...(metadata.inReferenceTo ? {
+      inReferenceTo: metadata.inReferenceTo.map(refItem => ({ ...refItem })),
+    } : {}),
+    ...(metadata.entangled ? {
+      entangled: { ...metadata.entangled },
+    } : {}),
+    ...(metadata.initialRecipients?.length ? {
+      initialRecipients: metadata.initialRecipients.map(recipient => ({ ...recipient })),
+    } : {}),
+  };
 }
 
 export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator>): DMessageGenerator {
@@ -198,7 +229,7 @@ export function duplicateDMessageGenerator(generator: Readonly<DMessageGenerator
 // helpers - status checks
 
 export function messageWasInterruptedAtStart(message: Pick<DMessage, 'generator' | 'fragments'>): boolean {
-  return message.generator?.tokenStopReason === 'client-abort' && message.fragments.length === 0;
+  return message.generator?.tokenStopReason === 'client-abort' && !message.fragments?.length;
 }
 
 // export function messageOnlyContainsPlaceholder(message: Pick<DMessage, 'fragments'>): boolean {
@@ -249,27 +280,41 @@ export function messageFragmentsReduceText(fragments: DMessageFragment[], fragme
     .map(fragment => {
       switch (true) {
         case isContentFragment(fragment):
-          switch (fragment.part.pt) {
+          const cPt = fragment.part.pt;
+          switch (cPt) {
             case 'text':
               return fragment.part.text;
             case 'error':
               return fragment.part.error;
+            case 'reference':
             case 'image_ref':
               return '';
             case 'tool_invocation':
             case 'tool_response':
               // Ignore tools for the text reduction
               return '';
+            case '_pt_sentinel':
+              return '';
+            default:
+              const _exhaustiveCheck: never = cPt;
+              break;
           }
           break;
         case isAttachmentFragment(fragment):
           if (excludeAttachmentFragments)
             return '';
-          switch (fragment.part.pt) {
+          const aPt = fragment.part.pt;
+          switch (aPt) {
             case 'doc':
               return fragment.part.data.text;
+            case 'reference':
             case 'image_ref':
               return '';
+            case '_pt_sentinel':
+              return '';
+            default:
+              const _exhaustiveCheck: never = aPt;
+              break;
           }
           break;
         case isVoidFragment(fragment):

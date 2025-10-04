@@ -226,7 +226,7 @@ export function ChatMessage(props: {
   const handleHighlightSelText = useSelHighlighterMemo(messageId, selText, contentFragments, fromAssistant, props.onMessageFragmentReplace);
 
   const textSubject = selText ? selText : fragmentFlattenedText;
-  const isSpecialT2I = textSubject.startsWith('https://images.prodia.xyz/') || textSubject.startsWith('/draw ') || textSubject.startsWith('/imagine ') || textSubject.startsWith('/img ');
+  const isSpecialT2I = textSubject.startsWith('/draw ') || textSubject.startsWith('/imagine ') || textSubject.startsWith('/img ');
   const couldDiagram = textSubject.length >= 100 && !isSpecialT2I;
   const couldImagine = textSubject.length >= 3 && !isSpecialT2I;
   const couldSpeak = couldImagine;
@@ -760,8 +760,8 @@ export function ChatMessage(props: {
             <InReferenceToList items={messageMetadata.inReferenceTo} />
           )}
 
-          {/* Image Attachment Fragments - just for a prettier display on top of the message */}
-          {imageAttachments.length >= 1 && (
+          {/* [NOT SYSTEM, UNREAL] Image Attachment Fragments - just for a prettier display on top of the message, but is "WRONG" logically as the text comes before the image */}
+          {!fromSystem && imageAttachments.length >= 1 && (
             <ImageAttachmentFragments
               imageAttachments={imageAttachments}
               contentScaling={adjContentScaling}
@@ -823,6 +823,17 @@ export function ChatMessage(props: {
               disableMarkdownText={disableMarkdown}
               onFragmentDelete={!props.onMessageFragmentDelete ? undefined : handleFragmentDelete}
               onFragmentReplace={!props.onMessageFragmentReplace ? undefined : handleFragmentReplace}
+            />
+          )}
+
+          {/* [SYSTEM, REAL] Image Attachment Fragments - just for a realistic display below the system instruction text/docs */}
+          {fromSystem && imageAttachments.length >= 1 && (
+            <ImageAttachmentFragments
+              imageAttachments={imageAttachments}
+              contentScaling={adjContentScaling}
+              messageRole={messageRole}
+              disabled={isEditingText}
+              onFragmentDelete={!props.onMessageFragmentDelete ? undefined : handleFragmentDelete}
             />
           )}
 
