@@ -1,11 +1,10 @@
 import { addDBImageAsset } from '~/common/stores/blob/dblobs-portability';
 
 import type { MaybePromise } from '~/common/types/useful.types';
-import { DEFAULT_ADRAFT_IMAGE_MIMETYPE } from '~/common/attachment-drafts/attachment.pipeline';
 import { convert_Base64WithMimeType_To_Blob } from '~/common/util/blobUtils';
-import { create_CodeExecutionInvocation_ContentFragment, create_CodeExecutionResponse_ContentFragment, create_FunctionCallInvocation_ContentFragment, createAnnotationsVoidFragment, createDMessageDataRefDBlob, createDVoidWebCitation, createErrorContentFragment, createModelAuxVoidFragment, createPlaceholderVoidFragment, createTextContentFragment, createZyncAssetReferenceContentFragment, DVoidModelAuxPart, DVoidPlaceholderModelOp, isContentFragment, isModelAuxPart, isTextContentFragment, isVoidAnnotationsFragment, isVoidFragment } from '~/common/stores/chat/chat.fragments';
+import { create_CodeExecutionInvocation_ContentFragment, create_CodeExecutionResponse_ContentFragment, create_FunctionCallInvocation_ContentFragment, createAnnotationsVoidFragment, createDMessageDataRefDBlob, createDVoidWebCitation, createErrorContentFragment, createModelAuxVoidFragment, createPlaceholderVoidFragment, createTextContentFragment, createZyncAssetReferenceContentFragment, DMessageErrorPart, DVoidModelAuxPart, DVoidPlaceholderModelOp, isContentFragment, isModelAuxPart, isTextContentFragment, isVoidAnnotationsFragment, isVoidFragment } from '~/common/stores/chat/chat.fragments';
 import { ellipsizeMiddle } from '~/common/util/textUtils';
-import { imageBlobTransform } from '~/common/util/imageUtils';
+import { imageBlobTransform, PLATFORM_IMAGE_MIMETYPE } from '~/common/util/imageUtils';
 import { metricsFinishChatGenerateLg, metricsPendChatGenerateLg } from '~/common/stores/metrics/metrics.chatgenerate';
 import { nanoidToUuidV4 } from '~/common/util/idUtils';
 
@@ -46,12 +45,13 @@ export class ContentReassembler {
   constructor(
     private readonly accumulator: AixChatGenerateContent_LL,
     private readonly onAccumulatorUpdated?: () => MaybePromise<void>,
+    inspectorTransport?: AixClientDebugger.Transport,
     inspectorContext?: AixClientDebugger.Context,
     private readonly wireAbortSignal?: AbortSignal,
   ) {
 
     // [SUDO] Debugging the request, last-write-wins for the global (displayed in the UI)
-    this.debuggerFrameId = !inspectorContext ? null : aixClientDebugger_init(inspectorContext);
+    this.debuggerFrameId = !inspectorContext ? null : aixClientDebugger_init(inspectorTransport ?? 'trpc', inspectorContext);
 
   }
 
@@ -99,14 +99,27 @@ export class ContentReassembler {
     await this.#reassembleParticle({ cg: 'end', reason: 'abort-client', tokenStopReason: 'client-abort-signal' });
   }
 
-  async setClientExcepted(errorAsText: string): Promise<void> {
+  async setClientExcepted(errorAsText: string, errorHint?: DMessageErrorPart['hint']): Promise<void> {
     if (DEBUG_PARTICLES)
       console.log('-> aix.p: issue:', errorAsText);
 
-    this.onCGIssue({ cg: 'issue', issueId: 'client-read', issueText: errorAsText });
+    this.onCGIssue({ cg: 'issue', issueId: 'client-read', issueText: errorAsText, issueHint: errorHint });
 
     // NOTE: this doesn't go to the debugger anymore - as we only publish external particles to the debugger
     await this.#reassembleParticle({ cg: 'end', reason: 'issue-rpc', tokenStopReason: 'cg-issue' });
+  }
+
+  async setClientRetrying(strategy: 'reconnect' | 'resume', errorMessage: string, attempt: number, maxAttempts: number, delayMs: number, causeHttp?: number, causeConn?: string) {
+    if (DEBUG_PARTICLES)
+      console.log(`-> aix.p: client-retry (${strategy})`, { errorMessage, attempt, maxAttempts, delayMs, causeHttp, causeConn });
+
+    // process as retry-reset with cli-ll scope
+    this.onRetryReset({
+      cg: 'retry-reset', rScope: 'cli-ll',
+      rShallClear: false, // TODO: check if this is correct; we shall clear, but at the same time we haven't tried to see
+      reason: strategy === 'resume' ? `Resuming - ${errorMessage}` : `Reconnecting - ${errorMessage}`,
+      attempt, maxAttempts, delayMs, causeHttp, causeConn,
+    });
   }
 
 
@@ -226,11 +239,14 @@ export class ContentReassembler {
           case 'ii':
             await this.onAppendInlineImage(op);
             break;
+          case 'svs':
+            this.onSetVendorState(op);
+            break;
           case 'urlc':
             this.onAddUrlCitation(op);
             break;
           case 'vp':
-            this.onVoidPlaceholder(op);
+            this.onAppendVoidPlaceholder(op);
             break;
           default:
             // noinspection JSUnusedLocalSymbols
@@ -255,6 +271,9 @@ export class ContentReassembler {
             break;
           case 'issue':
             this.onCGIssue(op);
+            break;
+          case 'retry-reset':
+            this.onRetryReset(op);
             break;
           case 'set-metrics':
             this.onMetrics(op);
@@ -299,13 +318,13 @@ export class ContentReassembler {
 
   }
 
-  private onAppendReasoningText({ _t /*, weak*/ }: Extract<AixWire_Particles.PartParticleOp, { p: 'tr_' }>): void {
+  private onAppendReasoningText({ _t, restart }: Extract<AixWire_Particles.PartParticleOp, { p: 'tr_' }>): void {
     // Break text accumulation
     this.currentTextFragmentIndex = null;
 
     // append to existing ModelAuxVoidFragment if possible
     const currentFragment = this.accumulator.fragments[this.accumulator.fragments.length - 1];
-    if (currentFragment && isVoidFragment(currentFragment) && isModelAuxPart(currentFragment.part)) {
+    if (!restart && currentFragment && isVoidFragment(currentFragment) && isModelAuxPart(currentFragment.part)) {
       const appendedPart = { ...currentFragment.part, aText: (currentFragment.part.aText || '') + _t } satisfies DVoidModelAuxPart;
       this.accumulator.fragments[this.accumulator.fragments.length - 1] = { ...currentFragment, part: appendedPart };
       return;
@@ -463,7 +482,7 @@ export class ContentReassembler {
     } catch (error: any) {
       console.warn('[DEV] Failed to add inline audio to DBlobs:', { label: safeLabel, error, mimeType, size: base64Data.length });
       // Add an error fragment instead
-      this.accumulator.fragments.push(createErrorContentFragment(`Failed to process audio: ${error?.message || 'Unknown error'}`));
+      this.accumulator.fragments.push(createErrorContentFragment(`Failed to process audio: ${error?.message || 'Unknown error'}`, 'aix-audio-processing'));
     }
   }
 
@@ -483,7 +502,7 @@ export class ContentReassembler {
       // perform resize/type conversion if desired, and find the image dimensions
       const shallConvert = GENERATED_IMAGES_CONVERT_TO_COMPRESSED && inputType === 'image/png';
       const { blob: imageBlob, height: imageHeight, width: imageWidth } = await imageBlobTransform(inputImage, {
-        convertToMimeType: shallConvert ? DEFAULT_ADRAFT_IMAGE_MIMETYPE : undefined,
+        convertToMimeType: shallConvert ? PLATFORM_IMAGE_MIMETYPE : undefined,
         convertToLossyQuality: GENERATED_IMAGES_COMPRESSION_QUALITY,
         throwOnTypeConversionError: true,
         debugConversionLabel: `ContentReassembler(ii)`,
@@ -564,7 +583,7 @@ export class ContentReassembler {
     // This ensures we don't interrupt the text flow
   }
 
-  private onVoidPlaceholder(vp: Extract<AixWire_Particles.PartParticleOp, { p: 'vp' }>): void {
+  private onAppendVoidPlaceholder(vp: Extract<AixWire_Particles.PartParticleOp, { p: 'vp' }>): void {
     const { text, mot } = vp;
 
     // update the model op
@@ -586,6 +605,24 @@ export class ContentReassembler {
     this.accumulator.fragments.unshift(placeholderFragment); // Add to beginning
 
     // Placeholders don't affect text fragment indexing
+    // NOTE: we could have placeholders breaking text accumulation into new fragments with `this.currentTextFragmentIndex = null;`, however
+    // since placeholders are used a lot with hosted tool calls, this could lead to way too many fragments being created
+  }
+
+  private onSetVendorState(vs: Extract<AixWire_Particles.PartParticleOp, { p: 'svs' }>): void {
+    // apply vendor state to the last created fragment
+    const lastFragment = this.accumulator.fragments[this.accumulator.fragments.length - 1];
+    if (!lastFragment) {
+      console.warn('[ContentReassembler] Vendor state particle without preceding content fragment');
+      return;
+    }
+
+    // attach vendor state
+    const { vendor, state } = vs;
+    lastFragment.vendorState = {
+      ...lastFragment.vendorState,
+      [vendor]: state,
+    };
   }
 
   // Helper to remove placeholder when real content arrives
@@ -643,7 +680,7 @@ export class ContentReassembler {
     }
   }
 
-  private onCGIssue({ issueId: _issueId /* Redundant as we add an Error Fragment already */, issueText }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'issue' }>): void {
+  private onCGIssue({ issueId: _issueId /* Redundant as we add an Error Fragment already */, issueText, issueHint }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'issue' }> & { issueHint?: DMessageErrorPart['hint'] }): void {
     // NOTE: not sure I like the flow at all here
     // there seem to be some bad conditions when issues are raised while the active part is not text
     if (MERGE_ISSUES_INTO_TEXT_PART_IF_OPEN) {
@@ -654,8 +691,31 @@ export class ContentReassembler {
         return;
       }
     }
-    this.accumulator.fragments.push(createErrorContentFragment(issueText));
+    this.accumulator.fragments.push(createErrorContentFragment(issueText, issueHint));
     this.currentTextFragmentIndex = null;
+  }
+
+  private onRetryReset({ rScope, rShallClear, attempt, maxAttempts, delayMs, reason, causeHttp, causeConn }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'retry-reset' }>): void {
+    // operation-level retry likely requires a wipe
+    if (rShallClear) {
+      this.currentTextFragmentIndex = null;
+      this.accumulator.fragments = [];
+      delete this.accumulator.genTokenStopReason;
+      // keep metrics/model/handle intact - may be useful for debugging retries
+
+      // discard any pending particles from the failed attempt
+      this.wireParticlesBacklog.length = 0;
+    }
+
+    // -> ph: show retry status
+    const retryMessage = `Retrying [${attempt}/${maxAttempts}] in ${Math.round(delayMs / 1000)}s - ${reason}`;
+    this.accumulator.fragments.push(createPlaceholderVoidFragment(retryMessage, undefined, undefined, {
+      ctl: 'ec-retry',
+      rScope: rScope,
+      rAttempt: attempt,
+      ...(causeHttp ? { rCauseHttp: causeHttp } : undefined),
+      ...(causeConn ? { rCauseConn: causeConn } : undefined),
+    }));
   }
 
   private onMetrics({ metrics }: Extract<AixWire_Particles.ChatGenerateOp, { cg: 'set-metrics' }>): void {

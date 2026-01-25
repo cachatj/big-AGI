@@ -1,5 +1,5 @@
 import type { IModelVendor } from '../IModelVendor';
-import type { OpenAIAccessSchema } from '../../server/openai/openai.router';
+import type { OpenAIAccessSchema } from '../../server/openai/openai.access';
 
 import { getLLMPricing } from '~/common/stores/llms/llms.types';
 
@@ -13,6 +13,7 @@ export const isValidOpenRouterKey = (apiKey?: string) => !!apiKey && apiKey.star
 export interface DOpenRouterServiceSettings {
   oaiKey: string;
   oaiHost: string;
+  csf?: boolean;
 }
 
 /**
@@ -30,10 +31,14 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
   id: 'openrouter',
   name: 'OpenRouter',
   displayRank: 40,
+  displayGroup: 'popular',
   location: 'cloud',
   instanceLimit: 1,
   hasFreeModels: true,
   hasServerConfigKey: 'hasLlmOpenRouter',
+
+  /// client-side-fetch ///
+  csfAvailable: _csfOpenRouterAvailable,
 
   // functions
   initializeSetup: (): DOpenRouterServiceSettings => ({
@@ -42,11 +47,11 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
   }),
   getTransportAccess: (partialSetup): OpenAIAccessSchema => ({
     dialect: 'openrouter',
+    clientSideFetch: _csfOpenRouterAvailable(partialSetup) && !!partialSetup?.csf,
     oaiKey: partialSetup?.oaiKey || '',
     oaiOrg: '',
     oaiHost: partialSetup?.oaiHost || '',
     heliKey: '',
-    moderationCheck: false,
   }),
 
   // there is delay for OpenRouter Free API calls
@@ -74,3 +79,7 @@ export const ModelVendorOpenRouter: IModelVendor<DOpenRouterServiceSettings, Ope
 
 // rate limit timestamp
 let nextGenerationTs = 0;
+
+function _csfOpenRouterAvailable(s?: Partial<DOpenRouterServiceSettings>) {
+  return !!s?.oaiKey;
+}

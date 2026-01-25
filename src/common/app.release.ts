@@ -1,5 +1,5 @@
 /**
- * Copyright (c)2024-2025 Enrico Ros
+ * Copyright (c)2024-2026 Enrico Ros
  *
  * This file is include by both the frontend and backend, however depending on the time
  * of the build, the values may be different.
@@ -23,8 +23,8 @@ export const Release = {
 
   // this is here to trigger revalidation of data, e.g. models refresh
   Monotonics: {
-    Aix: 37,
-    NewsVersion: 200,
+    Aix: 51,
+    NewsVersion: 202,
   },
 
   // Frontend: pretty features
@@ -59,6 +59,14 @@ export const Release = {
 
 
 export const BaseProduct = {
+  ProductName: 'Big-AGI',
+  ProductURL: 'https://big-agi.com',
+  PrivacyPolicy: 'https://big-agi.com/privacy',
+  TermsOfService: 'https://big-agi.com/terms',
+  // ecosystem
+  DocsBaseSite: 'https://big-agi.com/docs',
+  OpenSupportDiscord: 'https://discord.gg/MkH4qj2Jp9',
+  OpenSourceRepo: 'https://github.com/enricoros/big-agi',
   ReleaseNotes: '',
-  SupportForm: (_userId?: string) => 'https://github.com/enricoros/big-AGI/issues/new',
+  SupportForm: (_userId?: string) => 'https://github.com/enricoros/big-AGI/issues/new?template=ai-triage.yml',
 } as const;

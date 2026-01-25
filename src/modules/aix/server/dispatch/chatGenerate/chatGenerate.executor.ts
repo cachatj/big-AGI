@@ -1,10 +1,13 @@
 import { createEmptyReadableStream, safeErrorString } from '~/server/wire';
-import { createRetryablePromise } from '~/server/trpc/trpc.fetchers.retrier';
+import { createRetryablePromise, RetryAttempt } from '~/server/trpc/trpc.fetchers.retrier';
 import { fetchResponseOrTRPCThrow } from '~/server/trpc/trpc.router.fetchers';
 
-import { AIX_SECURITY_ONLY_IN_DEV_BUILDS, AixDebugObject } from '../../api/aix.router';
+import { objectDeepCloneWithStringLimit } from '~/common/util/objectUtils';
+
+import { AIX_SECURITY_ONLY_IN_DEV_BUILDS } from '../../api/aix.security';
 import { AixWire_Particles } from '../../api/aix.wiretypes';
 
+import { AixDebugObject } from './chatGenerate.debug';
 import { AixDemuxers } from '../stream.demuxers';
 import { ChatGenerateDispatch, ChatGenerateDispatchRequest, ChatGenerateParseFunction } from './chatGenerate.dispatch';
 import { ChatGenerateTransmitter } from './ChatGenerateTransmitter';
@@ -36,7 +39,8 @@ export async function* executeChatGenerate(
   try {
     dispatch = dispatchCreatorFn();
   } catch (error: any) {
-    chatGenerateTx.setRpcTerminatingIssue('dispatch-prepare', `**[AIX Configuration Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown service preparation error'}`, false);
+    // log but don't warn on the server console, this is typically a service configuration issue (e.g. a missing password will throw here)
+    chatGenerateTx.setRpcTerminatingIssue('dispatch-prepare', `**[AIX Configuration Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown service preparation error'}`, 'srv-log');
     yield* chatGenerateTx.flushParticles();
     return; // exit
   }
@@ -54,7 +58,7 @@ export async function* executeChatGenerate(
 
   // Tack profiling particles if generated
   if (_d.profiler) {
-    chatGenerateTx.addDebugProfilererData(_d.profiler.getResultsData());
+    chatGenerateTx.addDebugProfilerData(_d.profiler.getResultsData());
     // performanceProfilerLog('AIX Router Performance', profiler?.getResultsData()); // uncomment to log to server console
     _d.profiler.clearMeasurements();
   }
@@ -93,13 +97,17 @@ async function* _connectToDispatch(
 
     // Blocking fetch with heartbeats - combats timeouts, for instance with long Anthropic requests (>25s on large requests for Opus 3 models)
     _d.profiler?.measureStart('connect');
-    const connectionOperation = () => fetchResponseOrTRPCThrow({
+    const connectionOperationCreator = () => fetchResponseOrTRPCThrow({
       ...request,
       signal: intakeAbortSignal,
       name: `Aix.${_d.prettyDialect}`,
       throwWithoutName: true,
     });
-    const chatGenerateResponsePromise = createRetryablePromise(connectionOperation, intakeAbortSignal);
+    const onRetryAttempt = (info: RetryAttempt) => {
+      // -> retry-server-dispatch
+      chatGenerateTx.sendControl({ cg: 'retry-reset', rScope: 'srv-dispatch', rShallClear: false, reason: 'retrying initial connection', ...info });
+    };
+    const chatGenerateResponsePromise = createRetryablePromise(connectionOperationCreator, intakeAbortSignal, onRetryAttempt);
     const dispatchResponse = yield* heartbeatsWhileAwaiting(chatGenerateResponsePromise);
     _d.profiler?.measureEnd('connect');
 
@@ -107,8 +115,8 @@ async function* _connectToDispatch(
     return dispatchResponse;
 
   } catch (error: any) {
-    // Handle expected dispatch abortion while the first fetch hasn't even completed
-    if (error && error?.name === 'TRPCError' && intakeAbortSignal.aborted) {
+    // Handle expected dispatch abortion while the first fetch hasn't even completed - both TRPCError (for RPC conversion) and TRPCFetcherError (for direct fetch)
+    if (error && (error?.name === 'TRPCError' /* tRPC */ || error?.name === 'TRPCFetcherError') && intakeAbortSignal.aborted) {
       chatGenerateTx.setEnded('done-dispatch-aborted');
       yield* chatGenerateTx.flushParticles();
       return null; // signal caller to exit
@@ -155,9 +163,9 @@ async function* _consumeDispatchUnified(
 
   } catch (error: any) {
     if (dispatchBody === undefined)
-      chatGenerateTx.setRpcTerminatingIssue('dispatch-read', `**[Reading Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream reading error'}`, true);
+      chatGenerateTx.setRpcTerminatingIssue('dispatch-read', `**[Reading Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream reading error'}`, 'srv-warn');
     else
-      chatGenerateTx.setRpcTerminatingIssue('dispatch-parse', ` **[Parsing Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream parsing error'}.\nInput data: ${dispatchBody}.\nPlease open a support ticket on GitHub.`, true);
+      chatGenerateTx.setRpcTerminatingIssue('dispatch-parse', ` **[Parsing Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream parsing error'}.\n\nInput data: ${objectDeepCloneWithStringLimit(dispatchBody, 'aix.parsing-issue', 2048)}.\n\nPlease open a support ticket on GitHub.`, 'srv-warn');
   }
 }
 
@@ -210,13 +218,13 @@ async function* _consumeDispatchStream(
     } catch (error: any) {
       // Handle expected dispatch stream abortion - nothing to do, as the intake is already closed
       // TODO: check if 'AbortError' is also a cause. Seems like ResponseAborted is NextJS vs signal driven.
-      if (error && error?.name === 'ResponseAborted') {
+      if (error && (error?.name === 'ResponseAborted' /* tRPC */ || error?.name === 'AbortError' /* CSF */)) {
         chatGenerateTx.setEnded('done-dispatch-aborted');
         break; // outer do {}
       }
 
-      // Handle abnormal stream termination
-      chatGenerateTx.setRpcTerminatingIssue('dispatch-read', `**[Streaming Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream reading error'}`, true);
+      // Handle abnormal stream termination; print to the server console as well (important to debug)
+      chatGenerateTx.setRpcTerminatingIssue('dispatch-read', `**[Streaming Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream reading error'}`, 'srv-warn');
       break; // outer do {}
     }
 
@@ -258,8 +266,8 @@ async function* _consumeDispatchStream(
         // special: pass-through ONLY our retriable errors, for full operation-level retry - these are thrown by Parsers to remand reconnection
         if (error instanceof RequestRetryError) throw error;
 
-        // Handle parsing issue (likely a schema break); print it to the console as well
-        chatGenerateTx.setRpcTerminatingIssue('dispatch-parse', ` **[Service Parsing Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream parsing error'}.\nInput data: ${demuxedItem.data}.\nPlease open a support ticket on GitHub.`, false);
+        // Handle parsing issue (likely a schema break); print it to the server console as well
+        chatGenerateTx.setRpcTerminatingIssue('dispatch-parse', ` **[Service Parsing Issue] ${_d.prettyDialect}**: ${safeErrorString(error) || 'Unknown stream parsing error'}.\n\nInput data: ${objectDeepCloneWithStringLimit(demuxedItem.data, 'aix.service-parsing-issue', 2048)}.\n\nPlease open a support ticket on GitHub.`, 'srv-warn');
         break; // inner for {}, then outer do
       }
     }

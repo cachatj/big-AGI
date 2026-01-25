@@ -1,7 +1,7 @@
-import { anthropicAccess } from '~/modules/llms/server/anthropic/anthropic.router';
-import { geminiAccess } from '~/modules/llms/server/gemini/gemini.router';
-import { ollamaAccess } from '~/modules/llms/server/ollama/ollama.router';
-import { openAIAccess } from '~/modules/llms/server/openai/openai.router';
+import { ANTHROPIC_API_PATHS, anthropicAccess } from '~/modules/llms/server/anthropic/anthropic.access';
+import { OPENAI_API_PATHS, openAIAccess } from '~/modules/llms/server/openai/openai.access';
+import { geminiAccess } from '~/modules/llms/server/gemini/gemini.access';
+import { ollamaAccess } from '~/modules/llms/server/ollama/ollama.access';
 
 import type { AixAPI_Access, AixAPI_Model, AixAPI_ResumeHandle, AixAPIChatGenerate_Request } from '../../api/aix.wiretypes';
 import type { AixDemuxers } from '../stream.demuxers';
@@ -12,6 +12,7 @@ import { aixToAnthropicMessageCreate } from './adapters/anthropic.messageCreate'
 import { aixToGeminiGenerateContent } from './adapters/gemini.generateContent';
 import { aixToOpenAIChatCompletions } from './adapters/openai.chatCompletions';
 import { aixToOpenAIResponses } from './adapters/openai.responsesCreate';
+import { aixToXAIResponses } from './adapters/xai.responsesCreate';
 
 import type { IParticleTransmitter } from './parsers/IParticleTransmitter';
 import { createAnthropicMessageParser, createAnthropicMessageParserNS } from './parsers/anthropic.parser';
@@ -46,13 +47,27 @@ export type ChatGenerateParseFunction = (partTransmitter: IParticleTransmitter, 
  */
 export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_Model, chatGenerate: AixAPIChatGenerate_Request, streaming: boolean, enableResumability: boolean): ChatGenerateDispatch {
 
-  switch (access.dialect) {
+  const { dialect } = access;
+  switch (dialect) {
     case 'anthropic': {
-      const anthropicRequest = anthropicAccess(access, '/v1/messages', {
+
+      // [Anthropic, 2025-11-24] Detect if any tool uses Programmatic Tool Calling features (allowed_callers, input_examples)
+      const usesProgrammaticToolCalling = chatGenerate.tools?.some(tool =>
+          tool.type === 'function_call' && (
+            tool.function_call.allowed_callers?.includes('code_execution') ||
+            (tool.function_call.input_examples && tool.function_call.input_examples.length > 0)
+          ),
+      ) ?? false;
+
+      const anthropicRequest = anthropicAccess(access, ANTHROPIC_API_PATHS.messages, {
         modelIdForBetaFeatures: model.id,
         vndAntWebFetch: model.vndAntWebFetch === 'auto',
         vndAnt1MContext: model.vndAnt1MContext === true,
+        vndAntEffort: !!model.vndAntEffort,
         enableSkills: !!model.vndAntSkills,
+        enableStrictOutputs: !!model.strictJsonOutput || !!model.strictToolInvocations, // [Anthropic, 2025-11-13] for both JSON output and grammar-constrained tool invocations inputs
+        enableToolSearch: !!model.vndAntToolSearch,
+        enableProgrammaticToolCalling: usesProgrammaticToolCalling,
         // enableCodeExecution: ...
       });
 
@@ -93,10 +108,10 @@ export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_
     case 'ollama':
       return {
         request: {
-          ...ollamaAccess(access, '/v1/chat/completions'), // use the OpenAI-compatible endpoint
+          ...ollamaAccess(access, OPENAI_API_PATHS.chatCompletions), // use the OpenAI-compatible endpoint
           method: 'POST',
-          // body: ollamaChatCompletionPayload(model, _hist, access.ollamaJson, streaming),
-          body: aixToOpenAIChatCompletions('openai', model, chatGenerate, access.ollamaJson, streaming),
+          // body: ollamaChatCompletionPayload(model, _hist, streaming),
+          body: aixToOpenAIChatCompletions('openai', model, chatGenerate, streaming),
         },
         // demuxerFormat: streaming ? 'json-nl' : null,
         demuxerFormat: streaming ? 'fast-sse' : null,
@@ -104,6 +119,9 @@ export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_
         chatGenerateParse: streaming ? createOpenAIChatCompletionsChunkParser() : createOpenAIChatCompletionsParserNS(),
       };
 
+    default:
+      const _exhaustiveCheck: never = dialect;
+    // fallthrough
     case 'alibaba':
     case 'azure':
     case 'deepseek':
@@ -111,6 +129,7 @@ export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_
     case 'lmstudio':
     case 'localai':
     case 'mistral':
+    case 'moonshot':
     case 'openai':
     case 'openpipe':
     case 'openrouter':
@@ -118,29 +137,43 @@ export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_
     case 'togetherai':
     case 'xai':
 
-      // switch to the Responses API if the model supports it
+      // newer: OpenAI Responses API, for models that support it and all XAI models
       const isResponsesAPI = !!model.vndOaiResponsesAPI;
-      if (isResponsesAPI) {
+      const isXAIModel = dialect === 'xai'; // All XAI models are accessed via Responses now
+      if (isResponsesAPI || isXAIModel) {
         return {
           request: {
-            ...openAIAccess(access, model.id, '/v1/responses'),
+            ...openAIAccess(access, model.id, OPENAI_API_PATHS.responses),
             method: 'POST',
-            body: aixToOpenAIResponses(access.dialect, model, chatGenerate, false, streaming, enableResumability),
+            /**
+             * xAI uses its own Responses API adapter.
+             *
+             * Key differences from OpenAI Responses API:
+             * - No 'instructions' field - system content prepended to first user message
+             * - xAI-native tools: web_search, x_search, code_execution
+             * - Tool calls come in single chunks
+             *
+             * Note: Response format is compatible with OpenAI parser.
+             */
+            body: isXAIModel ? aixToXAIResponses(model, chatGenerate, streaming, enableResumability)
+              : aixToOpenAIResponses(dialect, model, chatGenerate, streaming, enableResumability),
           },
           demuxerFormat: streaming ? 'fast-sse' : null,
           chatGenerateParse: streaming ? createOpenAIResponsesEventParser() : createOpenAIResponseParserNS(),
         };
       }
 
+      // default: industry-standard OpenAI ChatCompletions API with per-dialect extensions
       return {
         request: {
-          ...openAIAccess(access, model.id, '/v1/chat/completions'),
+          ...openAIAccess(access, model.id, OPENAI_API_PATHS.chatCompletions),
           method: 'POST',
-          body: aixToOpenAIChatCompletions(access.dialect, model, chatGenerate, false, streaming),
+          body: aixToOpenAIChatCompletions(dialect, model, chatGenerate, streaming),
         },
         demuxerFormat: streaming ? 'fast-sse' : null,
         chatGenerateParse: streaming ? createOpenAIChatCompletionsChunkParser() : createOpenAIChatCompletionsParserNS(),
       };
+
   }
 }
 
@@ -151,13 +184,14 @@ export function createChatGenerateDispatch(access: AixAPI_Access, model: AixAPI_
  */
 export function createChatGenerateResumeDispatch(access: AixAPI_Access, resumeHandle: AixAPI_ResumeHandle, streaming: boolean): ChatGenerateDispatch {
 
-  switch (access.dialect) {
+  const { dialect } = access;
+  switch (dialect) {
     case 'azure':
     case 'openai':
     case 'openrouter':
 
       // ASSUME the OpenAI Responses API - https://platform.openai.com/docs/api-reference/responses/get
-      const { url, headers } = openAIAccess(access, '', `/v1/responses/${resumeHandle.responseId}`);
+      const { url, headers } = openAIAccess(access, '', `${OPENAI_API_PATHS.responses}/${resumeHandle.responseId}`);
       const queryParams = new URLSearchParams({
         stream: streaming ? 'true' : 'false',
         ...(!!resumeHandle.startingAfter && { starting_after: resumeHandle.startingAfter.toString() }),
@@ -170,6 +204,9 @@ export function createChatGenerateResumeDispatch(access: AixAPI_Access, resumeHa
         chatGenerateParse: streaming ? createOpenAIResponsesEventParser() : createOpenAIResponseParserNS(),
       };
 
+    default:
+      const _exhaustiveCheck: never = dialect;
+    // fallthrough
     case 'alibaba':
     case 'anthropic':
     case 'deepseek':
@@ -178,13 +215,14 @@ export function createChatGenerateResumeDispatch(access: AixAPI_Access, resumeHa
     case 'lmstudio':
     case 'localai':
     case 'mistral':
+    case 'moonshot':
     case 'ollama':
     case 'openpipe':
     case 'perplexity':
     case 'togetherai':
     case 'xai':
       // Throw on unsupported protocols (Azure and OpenRouter are speculatively supported)
-      throw new Error(`Resume not supported for dialect: ${access.dialect}`);
+      throw new Error(`Resume not supported for dialect: ${dialect}`);
 
   }
 }

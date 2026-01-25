@@ -545,6 +545,9 @@ export function Composer(props: {
 
     // Enter: primary action
     if (e.key === 'Enter') {
+      // Skip if composing (e.g., CJK input methods) - issue #784
+      if (e.nativeEvent.isComposing)
+        return;
 
       // Alt (Windows) or Option (Mac) + Enter: append the message instead of sending it
       if (e.altKey && !e.metaKey && !e.ctrlKey) {
@@ -859,7 +862,7 @@ export function Composer(props: {
                   <Textarea
                     variant='outlined'
                     color={isDraw ? 'warning' : isReAct ? 'success' : undefined}
-                    autoFocus
+                    autoFocus={isDesktop}
                     minRows={isMobile ? 3.5 : isDraw ? 4 : agiAttachmentPrompts.hasData ? 3 : showChatInReferenceTo ? 4 : 5}
                     maxRows={isMobile ? 8 : 10}
                     placeholder={textPlaceholder}
@@ -905,7 +908,7 @@ export function Composer(props: {
                   )}
 
                   {!showChatInReferenceTo && !isDraw && tokenLimit > 0 && (
-                    <TokenBadgeMemo hideBelowDollars={0.0001} chatPricing={tokenChatPricing} direct={tokensComposer} history={tokensHistory} responseMax={tokensResponseMax} limit={tokenLimit} showCost={labsShowCost} enableHover={!isMobile} showExcess absoluteBottomRight />
+                    <TokenBadgeMemo hideBelowDollars={0.01} chatPricing={tokenChatPricing} direct={tokensComposer} history={tokensHistory} responseMax={tokensResponseMax} limit={tokenLimit} showCost={labsShowCost} enableHover={!isMobile} showExcess absoluteBottomRight />
                   )}
 
                 </Box>

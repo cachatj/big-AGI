@@ -4,7 +4,7 @@
 
 import type { ModelVendorId } from '~/modules/llms/vendors/vendors.registry';
 
-import type { DModelParameterId, DModelParameterSpec, DModelParameterValues } from './llms.parameters';
+import type { DModelParameterSpecAny, DModelParameterValues } from './llms.parameters';
 import type { DModelPricing } from './llms.pricing';
 import type { DModelsServiceId } from './llms.service.types';
 
@@ -37,7 +37,7 @@ export interface DLLM {
   pricing?: DModelPricing;
 
   // parameters system
-  parameterSpecs: DModelParameterSpec<DModelParameterId>[];
+  parameterSpecs: DModelParameterSpecAny[];
   initialParameters: DModelParameterValues;
 
   // references
@@ -142,6 +142,7 @@ export type DModelInterfaceV1 =
   | 'oai-chat'
   | 'oai-chat-fn'
   | 'oai-chat-json'
+  | 'ant-tools-search'
   | 'oai-chat-vision'
   | 'oai-chat-reasoning'
   | 'oai-complete'
@@ -166,6 +167,7 @@ export type DModelInterfaceV1 =
 export const LLM_IF_OAI_Chat: DModelInterfaceV1 = 'oai-chat';
 export const LLM_IF_OAI_Fn: DModelInterfaceV1 = 'oai-chat-fn';
 export const LLM_IF_OAI_Json: DModelInterfaceV1 = 'oai-chat-json'; // for Structured Outputs (or JSON mode at worst)
+export const LLM_IF_ANT_ToolsSearch: DModelInterfaceV1 = 'ant-tools-search';
 // export const LLM_IF_OAI_JsonSchema: ... future?
 export const LLM_IF_OAI_Vision: DModelInterfaceV1 = 'oai-chat-vision';
 export const LLM_IF_OAI_Reasoning: DModelInterfaceV1 = 'oai-chat-reasoning';
@@ -193,6 +195,7 @@ export const LLMS_ALL_INTERFACES = [
   LLM_IF_OAI_Vision,          // GREAT TO HAVE - image inputs
   LLM_IF_OAI_Fn,              // IMPORTANT - support for function calls
   LLM_IF_OAI_Json,            // not used for now: structured outputs
+  LLM_IF_ANT_ToolsSearch,     // Anthropic tool: Tools Search
   // Generalized capabilities
   LLM_IF_OAI_Reasoning,       // COSMETIC ONLY - may show a 'brain' icon in supported screens
   LLM_IF_Outputs_Audio,       // COSMETIC ONLY FOR NOW - Models that generate audio output (TTS models)
