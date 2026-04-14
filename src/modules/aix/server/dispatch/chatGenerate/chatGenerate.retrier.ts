@@ -4,7 +4,7 @@ import type { AixWire_Particles } from '../../api/aix.wiretypes';
 
 import type { AixDebugObject } from './chatGenerate.debug';
 import type { ChatGenerateDispatch } from './chatGenerate.dispatch';
-import { executeChatGenerate } from './chatGenerate.executor';
+import { executeChatGenerateDispatch } from './chatGenerate.executor';
 
 
 // configuration
@@ -42,7 +42,7 @@ export class RequestRetryError extends Error {
  * Retries entire operation when RequestRetryError is thrown (e.g., Anthropic overloaded_error).
  */
 export async function* executeChatGenerateWithRetry(
-  dispatchCreatorFn: () => ChatGenerateDispatch,
+  dispatchCreatorFn: () => Promise<ChatGenerateDispatch>,
   streaming: boolean,
   abortSignal: AbortSignal,
   _d: AixDebugObject,
@@ -54,7 +54,7 @@ export async function* executeChatGenerateWithRetry(
   while (true) {
     try {
 
-      yield* executeChatGenerate(dispatchCreatorFn, streaming, abortSignal, _d, {
+      yield* executeChatGenerateDispatch(dispatchCreatorFn, streaming, abortSignal, _d, {
         retriesAvailable: attemptNumber < maxAttempts,
       });
 
