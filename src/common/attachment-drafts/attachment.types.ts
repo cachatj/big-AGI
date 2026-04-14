@@ -43,6 +43,13 @@ export type AttachmentDraft = {
 
 export type AttachmentDraftId = string;
 
+export type AttachmentCreationOptions = {
+  /** Also attach an image representation of the attachment. Requires Release.Features.ENABLE_TEXT_AND_IMAGES as well. */
+  hintAddImages?: boolean;
+}
+
+export type AttachmentCloudProviderId = 'gdrive' | 'onedrive' | 'dropbox';
+
 
 // 0. draft source (filled at the onset)
 
@@ -62,6 +69,23 @@ export type AttachmentDraftSource = {
   textPlain?: string;
   textHtml?: string;
 } | {
+  media: 'cloud';
+  origin: AttachmentDraftSourceOriginCloud;
+
+  // auth for fetching
+  accessToken: string;
+  // tokenExpiresAt?: number; // optional for staleness detection, unix ts
+
+  // recipe for fetching
+  provider: AttachmentCloudProviderId;
+  fileId: string;
+  mimeType: string; // cloud-native MIME (e.g., 'application/vnd.google-apps.document')
+
+  // decorative
+  fileName: string;
+  fileSize?: number;
+  webViewLink?: string; // link to view in cloud provider's UI
+} | {
   // special type for attachments thar are references to self (ego, application) objects
   media: 'ego';
   method: 'ego-fragments';
@@ -69,16 +93,18 @@ export type AttachmentDraftSource = {
   egoFragmentsInputData: DraftEgoFragmentsInputData;
 };
 
-export type AttachmentDraftSourceOriginFile = 'camera' | 'screencapture' | 'file-open' | 'clipboard-read' | AttachmentDraftSourceOriginDTO;
+export type AttachmentDraftSourceOriginFile =
+  | 'camera' | 'screencapture'
+  | 'live-feed-camera' | 'live-feed-screen'
+  | 'file-open'
+  | 'clipboard-read'
+  | AttachmentDraftSourceOriginDTO;
 
 export type AttachmentDraftSourceOriginDTO = 'drop' | 'paste';
 
 export type AttachmentDraftSourceOriginUrl = 'input-link' | 'clipboard-read' | AttachmentDraftSourceOriginDTO;
 
-export type AttachmentCreationOptions = {
-  /** Also attach an image representation of the attachment. Requires Release.Features.ENABLE_TEXT_AND_IMAGES as well. */
-  hintAddImages?: boolean;
-}
+export type AttachmentDraftSourceOriginCloud = `picker-${AttachmentCloudProviderId}`;
 
 
 // 1. draft input (loaded from the source)
@@ -157,6 +183,11 @@ export type AttachmentDraftConverterType =
 
 
 // 3. Output - this is done via DMessageAttachmentFragment[], to be directly compatible with our data
+
+
+// Actions on attachment drafts
+
+export type AttachmentDraftsAction = 'inline-text' | 'copy-text';
 
 
 /*export type AttachmentDraftPreview = {

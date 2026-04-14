@@ -17,9 +17,12 @@ const _knownDeepseekChatModels: ManualMappings = [
     description: 'Reasoning model with Chain-of-Thought capabilities, 128K context length. Supports JSON output and function calling.',
     contextWindow: 131072, // 128K
     interfaces: [...IF_3, LLM_IF_OAI_Reasoning],
+    // parameterSpecs: [
+    //   { paramId: 'llmVndMiscEffort', enumValues: ['none', 'high'] }, // not supported: this model is reasoning only
+    // ],
     maxCompletionTokens: 32768, // default, max: 65536
     chatPrice: { input: 0.28, output: 0.42, cache: { cType: 'oai-ac', read: 0.028 } },
-    benchmark: { cbaElo: 1418 }, // deepseek-r1-0528
+    benchmark: { cbaElo: 1412 }, //deepseek-v3.2-exp-thinking
   },
   {
     idPrefix: 'deepseek-chat',
@@ -29,7 +32,7 @@ const _knownDeepseekChatModels: ManualMappings = [
     interfaces: IF_3,
     maxCompletionTokens: 8192, // default is 4096, max is 8192
     chatPrice: { input: 0.28, output: 0.42, cache: { cType: 'oai-ac', read: 0.028 } },
-    benchmark: { cbaElo: 1419 }, // deepseek-v3.1-thinking
+    benchmark: { cbaElo: 1420 }, // deepseek-v3.2
   },
 ];
 
@@ -65,9 +68,4 @@ export function deepseekModelSort(a: ModelDescriptionSchema, b: ModelDescription
 
 // [DeepSeek, 2025-12-15] V3.2-Speciale endpoint has expired and been removed
 // The temporary endpoint (v3.2_speciale_expires_on_20251215) was decommissioned on Dec 15, 2025 15:59 UTC
-
-// export function deepseekInjectVariants(models: ModelDescriptionSchema[], model: ModelDescriptionSchema): ModelDescriptionSchema[] {
-//   // Currently no variants to inject (Speciale was removed after expiration)
-//   models.push(model);
-//   return models;
-// }
+// To re-enable variants, use createVariantInjector() from llm.server.variants.ts

@@ -56,6 +56,7 @@ class ResponseParserStateMachine {
 
   // low-level verifications
   #sequenceNumber: number = 0;
+  #sequenceNumberActive: boolean = false; // tracks if sequence_number validation is active
   #expectedEvents: TEventType[] | undefined;
 
   // most recently updated response object
@@ -77,11 +78,27 @@ class ResponseParserStateMachine {
 
   // Validations
 
-  validateSequenceNumber(sequenceNumber: number) {
+  validateSequenceNumber(sequenceNumber: number | undefined) {
     // time-to-first-event
     if (this.timeToFirstEvent === undefined)
       this.timeToFirstEvent = Date.now() - this.parserCreationTimestamp;
 
+    // [LiteLLM, 2026-01-29] Handle optional sequence_number for proxy compatibility
+    // Once we see a valid sequence_number, we activate validation and require monotonicity
+    if (sequenceNumber === undefined) {
+      // If validation was previously active, warn about missing sequence number
+      if (this.#sequenceNumberActive)
+        console.warn(`[DEV] AIX: OpenAI Responses: sequence_number missing after previously seeing valid numbers`);
+      return;
+    }
+
+    // First valid sequence_number activates validation
+    if (!this.#sequenceNumberActive) {
+      this.#sequenceNumberActive = true;
+      this.#sequenceNumber = sequenceNumber;
+    }
+
+    // Validate monotonicity
     if (sequenceNumber !== this.#sequenceNumber)
       console.warn(`[DEV] AIX: OpenAI Responses: sequence mismatch: got ${sequenceNumber}, expected ${this.#sequenceNumber}`);
     this.#sequenceNumber = sequenceNumber + 1;
@@ -248,6 +265,11 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
 
       // level 1. Lifecycle events
 
+      // 1.0. Request queued (background/async or under load) - response.created will follow
+      case 'response.queued':
+        R.setResponse(eventType, event.response);
+        break;
+
       // 1.1. First event, with the response substrate
       case 'response.created':
 
@@ -306,6 +328,9 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
           if (metrics)
             pt.updateMetrics(metrics);
         }
+
+        // -> End of the response
+        pt.setDialectEnded('done-dialect'); // OpenAI Responses: 'response.completed'
         break;
 
       case 'response.failed':
@@ -381,7 +406,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
             // Create inline image with base64 data
             if (igResult)
               pt.appendImageInline(
-                'image/png', // default mime type
+                _imageGenerationMimeType(doneItem), // infer from output_format echoed in the item
                 igResult,
                 igRevisedPrompt || 'Generated image',
                 'gpt-image-1', // generator
@@ -620,7 +645,7 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         const errorParam = safeErrorString(event.error?.param || event?.param) ?? undefined;
 
         // Transmit the error as text - note: throw if you want to transmit as 'error'
-        // FIXME: potential point for throwing RequestRetryError (using 'srv-warn' for now)
+        // FIXME: potential point for throwing OperationRetrySignal (using 'srv-warn' for now)
         pt.setDialectTerminatingIssue(`${errorCode || 'Error'}: ${errorMessage || 'unknown.'}${errorParam ? ` (param: ${errorParam})` : ''}`, IssueSymbols.Generic, 'srv-warn');
         break;
 
@@ -650,7 +675,6 @@ export function createOpenAIResponsesEventParser(): ChatGenerateParseFunction {
         // case 'response.mcp_list_tools.failed':
         // case 'response.custom_tool_call_input.delta':
         // case 'response.custom_tool_call_input.done':
-        // case 'response.queued':
         // FIXME: if we're here, we prob needed to implement the part
         aixResilientUnknownValue('OpenAI-Responses', 'eventType', eventType);
         break;
@@ -864,7 +888,7 @@ export function createOpenAIResponseParserNS(): ChatGenerateParseFunction {
           // Create inline image with base64 data
           if (igResult)
             pt.appendImageInline(
-              'image/png', // default mime type
+              _imageGenerationMimeType(oItem), // infer from output_format echoed in the item
               igResult,
               igRevisedPrompt || 'Generated image',
               'gpt-image-1', // generator
@@ -973,7 +997,7 @@ function _forwardResponseError(parsedData: any, pt: IParticleTransmitter) {
   }
 
   // Transmit the error as text - note: throw if you want to transmit as 'error'
-  // FIXME: potential point for throwing RequestRetryError (using 'srv-warn' for now)
+  // FIXME: potential point for throwing OperationRetrySignal (using 'srv-warn' for now)
   pt.setDialectTerminatingIssue(safeErrorString(error) || 'unknown.', IssueSymbols.Generic, 'srv-warn');
   return true;
 }
@@ -1003,6 +1027,22 @@ function _forwardTextAnnotation(pt: IParticleTransmitter, annotation: Exclude<Ex
       if (annotation)
         console.log(`[DEV] AIX: Unknown annotation type: ${annotation.type}`, { annotation });
       break;
+  }
+}
+
+/**
+ * Infers the mime type from the image_generation_call output item's output_format field.
+ * The API echoes the output_format in the done item (e.g. 'png', 'webp', 'jpeg').
+ */
+function _imageGenerationMimeType(item: { output_format?: string }): string {
+  switch ((item as any).output_format) {
+    case 'webp':
+      return 'image/webp';
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+    default:
+      return 'image/png';
   }
 }
 

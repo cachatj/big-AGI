@@ -53,6 +53,13 @@ export const env = createEnv({
     ANTHROPIC_API_KEY: z.string().optional(),
     ANTHROPIC_API_HOST: z.url().optional(),
 
+    // LLM: AWS Bedrock (bearer token OR IAM credentials)
+    BEDROCK_BEARER_TOKEN: z.string().optional(), // Bedrock long-term API key (ABSK...) - takes priority over IAM credentials; short-term keys only work for runtime, not model listing
+    BEDROCK_ACCESS_KEY_ID: z.string().optional(),
+    BEDROCK_SECRET_ACCESS_KEY: z.string().optional(),
+    BEDROCK_SESSION_TOKEN: z.string().optional(), // required with the other 2 on corporate accounts sometimes
+    BEDROCK_REGION: z.string().optional(),
+
     // LLM: Deepseek AI
     DEEPSEEK_API_KEY: z.string().optional(),
 
@@ -126,12 +133,17 @@ export const env = createEnv({
    * Environment variables available on the client (and server).
    * You'll get type errors if these are not prefixed with NEXT_PUBLIC_.
    *
+   * This is here basically for validation, but seems to not be used anywhere in the client code.
+   *
    * NOTE: they must be set at build time, not runtime(!)
    */
   client: {
 
     // Frontend: Google Analytics GA4 Measurement ID
     NEXT_PUBLIC_GA4_MEASUREMENT_ID: z.string().optional(),
+
+    // Google Drive Picker: download files from Google Drive
+    NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID: z.string().optional(),
 
     // Frontend: server to use for PlantUML rendering
     NEXT_PUBLIC_PLANTUML_SERVER_URL: z.url().optional(),
@@ -144,6 +156,7 @@ export const env = createEnv({
   // with Noext.JS >= 13.4.4 we'd only need to destructure client variables
   experimental__runtimeEnv: {
     NEXT_PUBLIC_GA4_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID,
+    NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_DRIVE_CLIENT_ID,
     NEXT_PUBLIC_PLANTUML_SERVER_URL: process.env.NEXT_PUBLIC_PLANTUML_SERVER_URL,
   },
 });

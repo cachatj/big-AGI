@@ -10,13 +10,13 @@ import type { AixAPI_Access, AixAPI_ConnectionOptions_ChatGenerate, AixAPI_Conte
 import type { AixDebugObject } from '../server/dispatch/chatGenerate/chatGenerate.debug';
 import { AIX_INSPECTOR_ALLOWED_CONTEXTS, AIX_SECURITY_ONLY_IN_DEV_BUILDS } from '../server/api/aix.security';
 import { createChatGenerateDispatch } from '../server/dispatch/chatGenerate/chatGenerate.dispatch';
-import { executeChatGenerateWithRetry } from '../server/dispatch/chatGenerate/chatGenerate.retrier';
+import { executeChatGenerateWithContinuation } from '../server/dispatch/chatGenerate/chatGenerate.continuation';
 
 
 // --- Client-side AIX ChatGenerate Executor ---
 
 /**
- * Client-side chat generation - uses server's executeChatGenerateWithRetry directly.
+ * Client-side chat generation - uses server's executeChatGenerateWithContinuation directly.
  * Matches server-side pattern exactly.
  */
 export async function* clientSideChatGenerate(
@@ -32,15 +32,16 @@ export async function* clientSideChatGenerate(
   const _d: AixDebugObject = _createClientDebugConfig(access, connectionOptions, context.name);
   const chatGenerateDispatchCreator = () => createChatGenerateDispatch(access, model, chatGenerate, streaming, !!connectionOptions?.enableResumability);
 
-  yield* executeChatGenerateWithRetry(chatGenerateDispatchCreator, streaming, abortSignal, _d);
+  yield* executeChatGenerateWithContinuation(chatGenerateDispatchCreator, streaming, abortSignal, _d);
 }
 
 // CSF debug config - lighter than server-side
-function _createClientDebugConfig(access: AixAPI_Access, options: undefined | { debugDispatchRequest?: boolean, debugProfilePerformance?: boolean }, chatGenerateContextName: string): AixDebugObject {
+function _createClientDebugConfig(access: AixAPI_Access, options: undefined | { debugDispatchRequest?: boolean, debugProfilePerformance?: boolean, debugRequestBodyOverride?: Record<string, unknown> }, chatGenerateContextName: string): AixDebugObject {
   const echoRequest = !!options?.debugDispatchRequest && (AIX_SECURITY_ONLY_IN_DEV_BUILDS || AIX_INSPECTOR_ALLOWED_CONTEXTS.includes(chatGenerateContextName));
   return {
-    prettyDialect: capitalizeFirstLetter(access.dialect),
-    echoRequest: echoRequest,
+    prettyDialect: capitalizeFirstLetter(access.dialect), // string
+    echoRequest: echoRequest, // boolean
+    requestBodyOverride: echoRequest ? options?.debugRequestBodyOverride : undefined,
     consoleLogErrors: false, // NO client-side error-echo log to console (handled by UI)
     profiler: undefined, // NO client-side profiler
     wire: undefined, // NO client-side wire

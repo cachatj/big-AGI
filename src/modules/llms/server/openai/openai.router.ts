@@ -122,10 +122,15 @@ export const llmOpenAIRouter = createTRPCRouter({
 
       // [PROD] log/warn listModel errors
       if (!result.ok && result.error) {
+
+        // Network errors: do not log it here in production - likely a user error/net inaccessible
+        const isConnRefused = result.error instanceof TRPCFetcherError && ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND'].includes(result.error.connErrorName || '');
+        if (isConnRefused) return result;
+
         // '401 unauthorized' is expected with wrong/missing API keys - log instead of warn
         const is401 = result.error instanceof TRPCFetcherError && result.error.httpStatus === 401;
         const isLocalAI = input.access?.dialect === 'localai';
-        console[(is401 || isLocalAI) ? 'log' : 'warn'](`${path} (${input.access?.dialect || '?'}):${signal?.aborted ? ' [ABORTED]' : ''}`, result.error);
+        console[(is401 || isLocalAI) ? 'log' : 'warn'](`\n❌ [PROD] ${path}(${input.access?.dialect || '?'}):${signal?.aborted ? ' [ABORTED]' : ''}`, result.error);
       }
 
       // [DEV] NOTE: the trpc onError will also log next when in development mode, @see handlerEdgeRoutes
@@ -291,7 +296,14 @@ export const llmOpenAIRouter = createTRPCRouter({
     .input(listModelsInputSchema)
     .query(async ({ input: { access } }) => {
       const wireLocalAIModelsAvailable = await openaiGETOrThrow(access, '/models/available');
-      return wireLocalAIModelsAvailableOutputSchema.parse(wireLocalAIModelsAvailable).filter(model => !!model.name);
+      try {
+        return wireLocalAIModelsAvailableOutputSchema.parse(wireLocalAIModelsAvailable).filter(model => !!model.name);
+      } catch (error: any) {
+        throw new TRPCError({
+          code: 'UNPROCESSABLE_CONTENT',
+          message: `[LocalAI gallery issue]: The gallery response format is not compatible. ${error?.message || 'Schema validation failed.'}`,
+        });
+      }
     }),
 
   /* [LocalAI] Download a model from a Model Gallery */

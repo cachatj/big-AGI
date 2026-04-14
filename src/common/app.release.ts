@@ -23,8 +23,8 @@ export const Release = {
 
   // this is here to trigger revalidation of data, e.g. models refresh
   Monotonics: {
-    Aix: 51,
-    NewsVersion: 202,
+    Aix: 62,
+    NewsVersion: 204,
   },
 
   // Frontend: pretty features
@@ -59,14 +59,14 @@ export const Release = {
 
 
 export const BaseProduct = {
-  ProductName: 'Big-AGI (jcachat)',
-  ProductURL: 'https://big-agi.jcachat.dev',
-  PrivacyPolicy: 'https://big-agi.jcachat.dev/privacy',
-  TermsOfService: 'https://big-agi.jcachat.dev/terms',
+  ProductName: 'Big-AGI',
+  ProductURL: 'https://big-agi.com',
+  PrivacyPolicy: 'https://big-agi.com/privacy',
+  TermsOfService: 'https://big-agi.com/terms',
   // ecosystem
-  DocsBaseSite: 'https://big-agi.jcachat.dev/docs',
+  DocsBaseSite: 'https://big-agi.com/docs',
   OpenSupportDiscord: 'https://discord.gg/MkH4qj2Jp9',
-  OpenSourceRepo: 'https://github.com/cachatj/big-AGI',
+  OpenSourceRepo: 'https://github.com/enricoros/big-agi',
   ReleaseNotes: '',
-  SupportForm: (_userId?: string) => 'https://github.com/cachatj/big-AGI/issues/new',
+  SupportForm: (_userId?: string) => 'https://github.com/enricoros/big-AGI/issues/new?template=ai-triage.yml',
 } as const;

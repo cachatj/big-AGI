@@ -1,11 +1,26 @@
 import { create } from 'zustand';
 
+import type { AixAPI_Context_ChatGenerate } from '../../server/api/aix.wiretypes';
+
 //
 // NOTE: this file is supposed to be lightweight and to be kept in memory. Particles are used by reference and
 // not cloned or modified. Visualization is a Reactive stringification of the referred objects pretty much.
 //
 
 const DEFAULT_FRAMES_COUNT = 10;
+
+// Context names that should NOT auto-select when created (background operations)
+const BACKGROUND_CONTEXT_NAMES = [
+  'chat-ai-summarize',
+  'chat-ai-summary',
+  'chat-ai-title',
+  'chat-attachment-prompts',
+  'chat-followup-chartjs',
+  'chat-followup-diagram',
+  'chat-followup-htmlui',
+  'fixup-code',
+  'aifn-image-caption',
+] as const satisfies (AixAPI_Context_ChatGenerate['name'] | string)[];
 
 
 /// Types ///
@@ -78,6 +93,10 @@ interface AixClientDebuggerState {
   frames: AixClientDebugger.Frame[];
   activeFrameId: AixFrameId | null;
   maxFrames: number;
+  // AIX force disable streaming for all requests (separate from per-model llmForceNoStream)
+  aixNoStreaming: boolean;
+  // AIX next payload override - JSON string injected into requests after validation
+  requestBodyOverrideJson: string;
 }
 
 interface AixClientDebuggerActions {
@@ -103,6 +122,8 @@ export const useAixClientDebuggerStore = create<AixClientDebuggerStore>((_set) =
   frames: [],
   activeFrameId: null,
   maxFrames: DEFAULT_FRAMES_COUNT,
+  aixNoStreaming: false,
+  requestBodyOverrideJson: '',
 
 
   // Frame actions
@@ -110,9 +131,14 @@ export const useAixClientDebuggerStore = create<AixClientDebuggerStore>((_set) =
   createFrame: (transport, initialContext) => {
     const newFrame = _createAixClientDebuggerFrame(transport, initialContext);
 
+    // Don't auto-select background operations (e.g., title generation) to avoid
+    // stealing focus from the main conversation request
+    const isBackgroundOperation = (BACKGROUND_CONTEXT_NAMES as readonly string[]).includes(initialContext.contextName);
+
     _set((state) => ({
       frames: [newFrame, ...state.frames].slice(0, state.maxFrames),
-      activeFrameId: newFrame.id,
+      // Auto-select if: no active frame yet, OR this is not a background operation
+      activeFrameId: (!state.activeFrameId || !isBackgroundOperation) ? newFrame.id : state.activeFrameId,
     }));
 
     return newFrame.id;
@@ -170,6 +196,22 @@ export const useAixClientDebuggerStore = create<AixClientDebuggerStore>((_set) =
 }));
 
 
-export function aixClientDebuggerActions() {
-  return useAixClientDebuggerStore.getState() as AixClientDebuggerActions;
+export function aixClientDebuggerActions(): AixClientDebuggerActions {
+  return useAixClientDebuggerStore.getState();
+}
+
+export function aixClientDebuggerSetRBO(json: string) {
+  useAixClientDebuggerStore.setState({ requestBodyOverrideJson: json });
+}
+
+export function aixClientDebuggerGetRBO(): string {
+  return useAixClientDebuggerStore.getState().requestBodyOverrideJson;
+}
+
+export function getAixDebuggerNoStreaming(): boolean {
+  return useAixClientDebuggerStore.getState().aixNoStreaming;
+}
+
+export function toggleAixDebuggerNoStreaming(): void {
+  useAixClientDebuggerStore.setState(state => ({ aixNoStreaming: !state.aixNoStreaming }));
 }
