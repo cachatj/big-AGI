@@ -1,15 +1,16 @@
 import * as React from 'react';
 
 import { FormControl, Typography } from '@mui/joy';
+import CodeIcon from '@mui/icons-material/Code';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
 import ShortcutIcon from '@mui/icons-material/Shortcut';
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import SpeedIcon from '@mui/icons-material/Speed';
 
 import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
 import { FormSwitchControl } from '~/common/components/forms/FormSwitchControl';
 import { Link } from '~/common/components/Link';
+import { PhImageSquare } from '~/common/components/icons/phosphor/PhImageSquare';
 import { useIsMobile } from '~/common/components/useMatchMedia';
 import { useUXLabsStore } from '~/common/stores/store-ux-labs';
 
@@ -24,12 +25,13 @@ export function UxLabsSettings() {
     labsAutoHideComposer, setLabsAutoHideComposer,
     labsShowShortcutBar, setLabsShowShortcutBar,
     labsComposerAttachmentsInline, setLabsComposerAttachmentsInline,
+    labsSingleDollarLatex, setLabsSingleDollarLatex,
   } = useUXLabsStore();
 
   return <>
 
     <FormSwitchControl
-      title={<><ImageOutlinedIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Lossless Images</>} description={labsLosslessImages ? 'Large storage use' : 'Compress'}
+      title={<><PhImageSquare sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Lossless Images</>} description={labsLosslessImages ? 'Large storage use' : 'Compress'}
       tooltipWarning={labsLosslessImages}
       tooltip={<>
         Preserves the original lossless PNG format for AI-generated images instead of compressing them to WebP/JPEG.
@@ -54,6 +56,17 @@ export function UxLabsSettings() {
       title={<><ShortcutIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Shortcuts Bar</>} description={labsShowShortcutBar ? 'Status Bar' : 'Disabled'}
       checked={labsShowShortcutBar} onChange={setLabsShowShortcutBar}
     />}
+
+    <FormSwitchControl
+      title={<><CodeIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Dollar Inline LaTeX</>} description={labsSingleDollarLatex ? 'Enabled' : 'Disabled'}
+      tooltipWarning={labsSingleDollarLatex}
+      tooltip={<>
+        Renders single-dollar <code>$...$</code> as inline LaTeX math, in addition to the default <code>{'\\(...\\)'}</code> and <code>$$...$$</code> formats.
+        <hr />
+        WARNING: false positives are likely - currency like $10 or stock tickers like $AAPL may be incorrectly rendered as math.
+      </>}
+      checked={labsSingleDollarLatex} onChange={setLabsSingleDollarLatex}
+    />
 
     <FormSwitchControl
       title={<><AttachFileRoundedIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Attachment Buttons</>} description={labsComposerAttachmentsInline ? 'Enabled' : 'Disabled'}
