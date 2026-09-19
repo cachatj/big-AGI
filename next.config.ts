@@ -34,16 +34,18 @@ let nextConfig: NextConfig = {
 
   // Turbopack-native module replacement (mirrors the webpack NormalModuleReplacementPlugin below)
   // Turbopack ignores webpack plugins, so we need resolveAlias to swap server-only modules for client mocks.
-  turbopack: {
-    resolveAlias: {
-      '~/server/env.server': '~/server/env.client-mock',
-      './env.server': './env.client-mock',
-      '../server/env.server': '../server/env.client-mock',
-      '../../server/env.server': '../../server/env.client-mock',
-      '../../../server/env.server': '../../../server/env.client-mock',
-      '../../../../server/env.server': '../../../../server/env.client-mock',
-      '../posthog.server': '../posthog.client-mock',
-      './posthog.server': './posthog.client-mock',
+  experimental: {
+    turbo: {
+      resolveAlias: {
+        '~/server/env.server': '~/server/env.client-mock',
+        './env.server': './env.client-mock',
+        '../server/env.server': '../server/env.client-mock',
+        '../../server/env.server': '../../server/env.client-mock',
+        '../../../server/env.server': '../../../server/env.client-mock',
+        '../../../../server/env.server': '../../../../server/env.client-mock',
+        '../posthog.server': '../posthog.client-mock',
+        './posthog.server': './posthog.client-mock',
+      },
     },
   },
 
