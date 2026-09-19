@@ -19,9 +19,9 @@ import SettingsIcon from '@mui/icons-material/Settings';
 
 
 import { Brand } from '~/common/app.config';
-import { ChatBeamIcon } from '~/common/components/icons/ChatBeamIcon';
 import { PhChats } from '~/common/components/icons/phosphor/PhChats';
 import { PhChatsDuotone } from '~/common/components/icons/phosphor/PhChatsDuotone';
+import { PhGearSixIcon } from '~/common/components/icons/phosphor/PhGearSixIcon';
 import { hasNoChatLinkItems } from '~/modules/trade/link/store-share-link';
 
 
@@ -178,15 +178,6 @@ export const navItems: {
       hideIcon: true,
       isDev: true,
     },
-    {
-      name: 'Beam',
-      icon: ChatBeamIcon,
-      type: 'app',
-      route: '/dev/beam',
-      hideDrawer: true,
-      hideIcon: true,
-      isDev: true,
-    },
     // {
     //   name: 'Media Library',
     //   icon: ImageOutlinedIcon,
@@ -231,7 +222,7 @@ export const navItems: {
     },
     {
       name: 'App Preferences',
-      icon: SettingsIcon,
+      icon: PhGearSixIcon,
       type: 'modal',
       overlayId: 'settings',
     },

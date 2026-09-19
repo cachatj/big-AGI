@@ -1,17 +1,20 @@
 import * as React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 import { FormControl, Typography } from '@mui/joy';
 import CodeIcon from '@mui/icons-material/Code';
-import EditNoteIcon from '@mui/icons-material/EditNote';
+import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
 import ShortcutIcon from '@mui/icons-material/Shortcut';
 import SpeedIcon from '@mui/icons-material/Speed';
+import WidthWideIcon from '@mui/icons-material/WidthWide';
 
 import { FormLabelStart } from '~/common/components/forms/FormLabelStart';
 import { FormSwitchControl } from '~/common/components/forms/FormSwitchControl';
 import { Link } from '~/common/components/Link';
 import { PhImageSquare } from '~/common/components/icons/phosphor/PhImageSquare';
 import { useIsMobile } from '~/common/components/useMatchMedia';
+import { useUIPreferencesStore } from '~/common/stores/store-ui';
 import { useUXLabsStore } from '~/common/stores/store-ux-labs';
 
 
@@ -27,6 +30,7 @@ export function UxLabsSettings() {
     labsComposerAttachmentsInline, setLabsComposerAttachmentsInline,
     labsSingleDollarLatex, setLabsSingleDollarLatex,
   } = useUXLabsStore();
+  const [messageFullWidth, setMessageFullWidth] = useUIPreferencesStore(useShallow(state => [state.messageFullWidth, state.setMessageFullWidth]));
 
   return <>
 
@@ -74,7 +78,13 @@ export function UxLabsSettings() {
     />
 
     <FormSwitchControl
-      title={<><EditNoteIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Auto-hide input</>} description={labsAutoHideComposer ? 'Hover to show' : 'Always visible'}
+      title={<><WidthWideIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Full-Width Messages</>} description={messageFullWidth ? 'Stretch' : 'Fit content'}
+      tooltip='Stretch AI message contents to the full row width.'
+      checked={messageFullWidth} onChange={setMessageFullWidth}
+    />
+
+    <FormSwitchControl
+      title={<><EditNoteRoundedIcon sx={{ fontSize: 'lg', mr: 0.5, mb: 0.25 }} />Auto-hide input</>} description={labsAutoHideComposer ? 'Hover to show' : 'Always visible'}
       checked={labsAutoHideComposer} onChange={setLabsAutoHideComposer}
     />
 

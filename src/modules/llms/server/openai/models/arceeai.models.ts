@@ -4,7 +4,10 @@ import { DModelInterfaceV1, LLM_IF_OAI_Chat, LLM_IF_OAI_Fn, LLM_IF_OAI_Json, LLM
 
 import type { ModelDescriptionSchema } from '../../llm.server.types';
 
-import { fromManualMapping, ManualMappings } from '../../models.mappings';
+import { fromManualMapping, llmsDefineManualMappings } from '../../models.mappings';
+
+// --- Arcee AI Model ID inference (auto-derived from _arceeKnownModels) ---
+export type LlmsArceeAIModelId = typeof _arceeKnownModels[number]['idPrefix'];
 
 
 export function arceeAIHeuristic(hostname: string) {
@@ -26,6 +29,7 @@ const _wireArceeAIModelSchema = z.object({
   max_output_length: z.number().nullish(),
   quantization: z.string().nullish(),
   supported_features: z.array(z.string()).nullish(),
+  supported_reasoning_efforts: z.array(z.string()).nullish(), // [Arcee, 2026-08-17] added upstream, see _arceeEffortValues
   pricing: z.object({
     prompt: z.string().nullish(),
     completion: z.string().nullish(),
@@ -42,9 +46,17 @@ const _wireArceeAIListOutputSchema = z.object({
 type WireArceeAIModel = z.infer<typeof _wireArceeAIModelSchema>;
 
 
-const _arceeKnownModels: ManualMappings = [
+const _arceeKnownModels = llmsDefineManualMappings([
   // NOTE: no manual patching needed - API provides rich metadata
-] as const;
+]);
+
+
+/**
+ * [Arcee, 2026-08-17] The per-model effort ladder is declared by the API itself, so we never hardcode one:
+ * APIModelResponse.supported_reasoning_efforts (api.arcee.ai/openapi.json) enumerates exactly these values.
+ * Absent/empty -> no effort control.
+ */
+const _arceeEffortValues = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
 
 function _prettyModelName(model: WireArceeAIModel): string {
@@ -93,6 +105,9 @@ export function arceeAIModelsToModelDescriptions(wireModelsResponse: unknown): M
       if (features.has('reasoning'))
         interfaces.push(LLM_IF_OAI_Reasoning);
 
+      // effort ladder: only what this model declares, narrowed to the values we can render
+      const efforts = (model.supported_reasoning_efforts || []).filter((e): e is typeof _arceeEffortValues[number] => (_arceeEffortValues as readonly string[]).includes(e));
+
       // pricing: Arcee returns per-token as strings, convert to per-million-tokens
       const inputPrice = _arceePerTokenToPerMToken(model.pricing?.prompt ?? undefined);
       const outputPrice = _arceePerTokenToPerMToken(model.pricing?.completion ?? undefined);
@@ -110,6 +125,7 @@ export function arceeAIModelsToModelDescriptions(wireModelsResponse: unknown): M
         contextWindow,
         maxCompletionTokens,
         interfaces,
+        ...(efforts.length ? { parameterSpecs: [{ paramId: 'llmVndOaiEffort' as const, enumValues: efforts }] } : {}),
         chatPrice,
         hidden: false,
       });

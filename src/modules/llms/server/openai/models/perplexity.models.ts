@@ -1,7 +1,11 @@
 import type { ModelDescriptionSchema } from '../../llm.server.types';
 import { createVariantInjector, ModelVariantMap } from '../../llm.server.variants';
+import { llmsDefineModels } from '../../models.mappings';
 
-import { LLM_IF_HOTFIX_NoStream, LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning } from '~/common/stores/llms/llms.types';
+// --- Perplexity Model ID inference (auto-derived from _knownPerplexityChatModels) ---
+export type LlmsPerplexityModelId = typeof _knownPerplexityChatModels[number]['id'];
+
+import { LLM_IF_HOTFIX_NoStream, LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision } from '~/common/stores/llms/llms.types';
 
 
 // configuration
@@ -18,7 +22,7 @@ const _hardcodedPerplexityVariants: ModelVariantMap = !PERPLEXITY_ENABLE_VARIANT
     description: 'Expert-level research model with academic sources only. Searches scholarly databases, peer-reviewed papers, and academic publications. 128k context.',
     interfaces: [
       LLM_IF_HOTFIX_NoStream, // seems to be required for medium/academic
-      LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning,
+      LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision,
     ],
     parameterSpecs: [
       // Fixed parameters for academic search
@@ -33,7 +37,15 @@ const _hardcodedPerplexityVariants: ModelVariantMap = !PERPLEXITY_ENABLE_VARIANT
 };
 
 
-const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
+type _PerplexityModelDef = ModelDescriptionSchema & { pubDate: string };
+
+// [Perplexity, 2026-08-17] Sonar Chat Completions is superseded by the Agent API (out of scope for this file): the 4 ids
+// below are served until 2026-09-27, per the banner on every model page - https://docs.perplexity.ai/docs/sonar/models/sonar
+// Migration map (https://docs.perplexity.ai/docs/agent-api/migrate-from-sonar/overview): sonar -> 'fast' preset,
+// sonar-pro -> 'low', sonar-reasoning-pro -> 'medium', sonar-deep-research -> 'high'.
+// Re-verified 2026-08-17 (live probes + https://docs.perplexity.ai/getting-started/pricing): ids, context windows and prices unchanged.
+
+const _knownPerplexityChatModels = llmsDefineModels<_PerplexityModelDef>()([
 
   // Research Models
   {
@@ -42,7 +54,7 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     pubDate: '20250214',
     description: 'Expert-level research model for exhaustive searches and comprehensive reports. 128k context.',
     contextWindow: 128000,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning],
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision],
     parameterSpecs: [
       { paramId: 'llmVndOaiEffort', enumValues: ['low', 'medium', 'high'] },
       { paramId: 'llmVndOaiWebSearchContext', initialValue: 'low' }, // REUSE!
@@ -61,9 +73,9 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     id: 'sonar-reasoning-pro',
     label: 'Sonar Reasoning Pro',
     pubDate: '20250218',
-    description: 'Premier reasoning model (DeepSeek R1) with Chain of Thought. 128k context.',
+    description: 'Premier reasoning model with enhanced multi-step Chain of Thought. 128k context.',
     contextWindow: 128000,
-    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning],
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Reasoning, LLM_IF_OAI_Vision],
     parameterSpecs: [
       { paramId: 'llmVndOaiWebSearchContext', initialValue: 'low' }, // REUSE!
       { paramId: 'llmVndPerplexitySearchMode' },
@@ -84,7 +96,7 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     description: 'Advanced search model for complex queries and deep content understanding. 200k context.',
     contextWindow: 200000,
     maxCompletionTokens: 8000,
-    interfaces: [LLM_IF_OAI_Chat],
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision],
     parameterSpecs: [
       { paramId: 'llmVndOaiWebSearchContext', initialValue: 'low' }, // REUSE!
       { paramId: 'llmVndPerplexitySearchMode' },
@@ -102,7 +114,7 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
     pubDate: '20250121',
     description: 'Lightweight, cost-effective search model for quick, grounded answers. 128k context.',
     contextWindow: 128000,
-    interfaces: [LLM_IF_OAI_Chat],
+    interfaces: [LLM_IF_OAI_Chat, LLM_IF_OAI_Vision],
     parameterSpecs: [
       { paramId: 'llmVndOaiWebSearchContext', initialValue: 'low' }, // REUSE!
       { paramId: 'llmVndPerplexitySearchMode' },
@@ -120,7 +132,7 @@ const _knownPerplexityChatModels: ModelDescriptionSchema[] = [
   // - r1-1776: Removed August 2025. Use Sonar Reasoning Pro instead.
   // - llama-3.1-sonar-*-128k-online aliases: Removed February 2025.
 
-];
+]);
 
 
 export function perplexityHardcodedModelDescriptions() {

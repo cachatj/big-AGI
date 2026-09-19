@@ -4,18 +4,22 @@ import { ModelVendorAlibaba } from './alibaba/alibaba.vendor';
 import { ModelVendorAnthropic } from './anthropic/anthropic.vendor';
 import { ModelVendorAzure } from './azure/azure.vendor';
 import { ModelVendorBedrock } from './bedrock/bedrock.vendor';
+import { ModelVendorCerebras } from './cerebras/cerebras.vendor';
+import { ModelVendorCohere } from './cohere/cohere.vendor';
 import { ModelVendorDeepseek } from './deepseek/deepseekai.vendor';
 import { ModelVendorGemini } from './gemini/gemini.vendor';
 import { ModelVendorGroq } from './groq/groq.vendor';
 import { ModelVendorLMStudio } from './lmstudio/lmstudio.vendor';
 import { ModelVendorLocalAI } from './localai/localai.vendor';
 import { ModelVendorMistral } from './mistral/mistral.vendor';
+import { ModelVendorModular } from './modular/modular.vendor';
 import { ModelVendorMoonshot } from './moonshot/moonshot.vendor';
+import { ModelVendorNvidiaNIM } from './nvidianim/nvidianim.vendor';
 import { ModelVendorOllama } from './ollama/ollama.vendor';
 import { ModelVendorOpenAI } from './openai/openai.vendor';
-import { ModelVendorOpenPipe } from './openpipe/openpipe.vendor';
 import { ModelVendorOpenRouter } from './openrouter/openrouter.vendor';
 import { ModelVendorPerplexity } from './perplexity/perplexity.vendor';
+import { ModelVendorSakanaAI } from './sakanaai/sakanaai.vendor';
 import { ModelVendorTogetherAI } from './togetherai/togetherai.vendor';
 import { ModelVendorXAI } from './xai/xai.vendor';
 import { ModelVendorZAI } from './zai/zai.vendor';
@@ -28,18 +32,22 @@ export type ModelVendorId =
   | 'anthropic'
   | 'azure'
   | 'bedrock'
+  | 'cerebras'
+  | 'cohere'
   | 'deepseek'
   | 'googleai'
   | 'groq'
   | 'lmstudio'
   | 'localai'
   | 'mistral'
+  | 'modular'
   | 'moonshot'
+  | 'nvidianim'
   | 'ollama'
   | 'openai'
-  | 'openpipe'
   | 'openrouter'
   | 'perplexity'
+  | 'sakanaai'
   | 'togetherai'
   | 'xai'
   | 'zai'
@@ -51,18 +59,22 @@ const MODEL_VENDOR_REGISTRY = {
   anthropic: ModelVendorAnthropic,
   azure: ModelVendorAzure,
   bedrock: ModelVendorBedrock,
+  cerebras: ModelVendorCerebras,
+  cohere: ModelVendorCohere,
   deepseek: ModelVendorDeepseek,
   googleai: ModelVendorGemini,
   groq: ModelVendorGroq,
   lmstudio: ModelVendorLMStudio,
   localai: ModelVendorLocalAI,
   mistral: ModelVendorMistral,
+  modular: ModelVendorModular,
   moonshot: ModelVendorMoonshot,
+  nvidianim: ModelVendorNvidiaNIM,
   ollama: ModelVendorOllama,
   openai: ModelVendorOpenAI,
-  openpipe: ModelVendorOpenPipe,
   openrouter: ModelVendorOpenRouter,
   perplexity: ModelVendorPerplexity,
+  sakanaai: ModelVendorSakanaAI,
   togetherai: ModelVendorTogetherAI,
   xai: ModelVendorXAI,
   zai: ModelVendorZAI,

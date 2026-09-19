@@ -36,6 +36,9 @@ interface UIPreferencesStore {
   enterIsNewline: boolean;
   setEnterIsNewline: (enterIsNewline: boolean) => void;
 
+  messageFullWidth: boolean; // stretch assistant messages to the full row
+  setMessageFullWidth: (messageFullWidth: boolean) => void;
+
   renderCodeLineNumbers: boolean;
   setRenderCodeLineNumbers: (renderCodeLineNumbers: boolean) => void;
 
@@ -44,6 +47,9 @@ interface UIPreferencesStore {
 
   showPersonaFinder: boolean;
   setShowPersonaFinder: (showPersonaFinder: boolean) => void;
+
+  showModelsFn: boolean; // =false, DEV only
+  setShowModelsFn: (showModelsFn: boolean) => void;
 
   showModelsHidden: boolean;
   setShowModelsHidden: (showModelsHidden: boolean) => void;
@@ -110,6 +116,9 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
       enterIsNewline: false,
       setEnterIsNewline: (enterIsNewline: boolean) => set({ enterIsNewline }),
 
+      messageFullWidth: false,
+      setMessageFullWidth: (messageFullWidth: boolean) => set({ messageFullWidth }),
+
       renderCodeLineNumbers: false,
       setRenderCodeLineNumbers: (renderCodeLineNumbers: boolean) => set({ renderCodeLineNumbers }),
 
@@ -120,7 +129,10 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
       showPersonaFinder: false,
       setShowPersonaFinder: (showPersonaFinder: boolean) => set({ showPersonaFinder }),
 
-      showModelsHidden: false,
+      showModelsFn: false,
+      setShowModelsFn: (showModelsFn: boolean) => set({ showModelsFn }),
+
+      showModelsHidden: true,
       setShowModelsHidden: (showModelsHidden: boolean) => set({ showModelsHidden }),
 
       showModelsStarredOnly: false,
@@ -216,6 +228,10 @@ export function useUIComplexityIsMinimal(): boolean {
 
 export function useUIContentScaling(): ContentScaling {
   return useUIPreferencesStore((state) => state.contentScaling);
+}
+
+export function getUIEnterIsNewline(): boolean {
+  return useUIPreferencesStore.getState().enterIsNewline;
 }
 
 export function getAixInspectorEnabled(): boolean {
